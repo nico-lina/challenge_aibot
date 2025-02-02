@@ -1,49 +1,58 @@
 from cat.mad_hatter.decorators import tool, hook
-from .utili import connect
+from .utili import connect, get_warehouse, create_product
 import pandas as pd
 
-@tool(return_direct=True)
+@tool(
+    return_direct=True,
+    examples=[
+        "Qual è lo stato del mio magazzino",
+        "Come è la situazione del mio magazzino",
+        "Dammi qualche informazione sul mio magazzino"
+    ]
+)
 def get_the_warehouse_status(tool_input, cat):
-    """Replies to "what is the warehouse status", and similar questions. Input is always None.."""
-    print("AAAAAAA")
-    
-    db = connect("gattaccio")
-    query = """SELECT
-        --pp.id AS product_id,
-        pt.name->>'it_IT' AS product_name,
-        pp.default_code AS product_variant,
-        --sq.location_id,
-        sl.name as warehouse_name,
-        SUM(sq.quantity) as quantity,
-        SUM(sq.reserved_quantity) as reserved_quantity,
-        (SUM(sq.quantity) - SUM(sq.reserved_quantity)) AS available_quantity
-    FROM
-        stock_quant sq
-    JOIN
-        product_product pp ON pp.id = sq.product_id
-    JOIN
-        product_template pt ON pp.product_tmpl_id = pt.id
-    JOIN 
-        stock_location sl ON sl.id = sq.location_id
-    WHERE
-        sq.quantity > 0  -- Per mostrare solo i prodotti con quantità disponibile
-    GROUP BY
-        pp.id, pt.name, pp.default_code, sq.location_id, sl.name
-    ORDER BY
-        product_name;
-    """
-    df = pd.read_sql_query(query, db)
-    db.close()
-    mark = df.to_markdown(index=False)
+    """Rispondi a "Qual è lo stato del mio magazzino", e domande simili. Input è sempre None.."""
+
+    mark = get_warehouse()
     
     output = cat.llm(
-        f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione che renda tutto 
-        molto leggibile e in formato discorsivo, i dati contenuti in questa tabella:
+        f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione adeguata, i dati contenuti in questa tabella:
         
         {mark}
+        
+        Metti in evidenza quali prodotti vanno riordinati e di quanto. Non mostrare quantità riservata e quantità minima
         """, stream=True
     )
     output = output.replace("**", "")
     
 
     return output
+
+@tool(
+    return_direct=True,
+    examples=["Aggiungi il prodotto con quantità disponibile iniziale e quantità minima di riordino"]
+)
+def create_new_product(tool_input, cat):
+    """Crea un nuovo prodotto nel magazzino con la quantità specificata e la soglia di riordino.
+
+    Questo tool prende in input il nome del prodotto, la quantità disponibile iniziale e la quantità minima per il riordino.
+    Gli input devono essere forniti nel seguente formato:
+    - Il primo valore è una stringa contenente il nome del prodotto.
+    - Il secondo valore è un numero intero o decimale che rappresenta la quantità iniziale disponibile.
+    - Il terzo valore è un numero intero o decimale che indica la quantità minima per il riordino.
+
+"""
+
+    product_name, product_qty, product_min_qty = tool_input.split(",")
+    
+    product_name = product_name.replace(" ", "")
+    product_qty = float(product_qty.replace(" ", ""))
+    product_min_qty = (product_min_qty.replace(" ", ""))
+    
+    if create_product(product_name, product_qty, product_min_qty):
+        output = f"Ho creato il prodotto {product_name}"
+        return output
+    else:
+        return "Non ho potuto creare il prodotto"
+    
+    
