@@ -48,9 +48,13 @@ def create_new_product(tool_input, cat):
     product_name = product_name.replace(" ", "")
     product_qty = float(product_qty.replace(" ", ""))
     product_min_qty = (product_min_qty.replace(" ", ""))
+    product_description = cat.llm(
+        f"Genera una descrizione per il prodotto farmaceutico che si chiama {product_name}"
+    )
     
-    if create_product(product_name, product_qty, product_min_qty):
-        output = f"Ho creato il prodotto {product_name}"
+    result, link = create_product(product_name, product_qty, product_min_qty, product_description)
+    if result:
+        output = f"Ho creato il prodotto <a href=\"{link}\" target=\"_blank\"> {product_name}</a>"
         return output
     else:
         return "Non ho potuto creare il prodotto"

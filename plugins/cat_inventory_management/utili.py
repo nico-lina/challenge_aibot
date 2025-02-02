@@ -81,7 +81,7 @@ def get_warehouse():
     return mark
 
 
-def create_product(product_name, product_qty, product_min_qty):
+def create_product(product_name, product_qty, product_min_qty, product_description):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  
 
     db = 'health1'
@@ -98,7 +98,8 @@ def create_product(product_name, product_qty, product_min_qty):
     new_product_id = Product.create({
         'name': product_name,
         'is_storable': True,  
-        'categ_id': 1,  
+        'categ_id': 1,
+        'description': product_description,
     })
 
 
@@ -117,4 +118,5 @@ def create_product(product_name, product_qty, product_min_qty):
         'product_max_qty': product_min_qty, 
     })
     
-    return True
+    odoo_url = 'http://localhost:8069/web#id={}&model=product.product&view_type=form'.format(new_product_id)
+    return [True, odoo_url]
