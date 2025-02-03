@@ -73,7 +73,7 @@ def get_warehouse():
 
     # Creazione DataFrame
     df = pd.DataFrame(data)
-    df = df[df["Quantità Disponibile"] > 0]
+    df = df[df["Quantità Disponibile"] >= 0]
 
     # Stampa il DataFrame
     mark = df.to_markdown(index=False)

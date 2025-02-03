@@ -16,11 +16,11 @@ def get_the_warehouse_status(tool_input, cat):
     mark = get_warehouse()
     
     output = cat.llm(
-        f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione adeguata, i dati contenuti in questa tabella:
+        f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione adeguata e senza usare tabelle, i dati contenuti in questa tabella:
         
         {mark}
         
-        Metti in evidenza quali prodotti vanno riordinati e di quanto. Non mostrare quantità riservata e quantità minima
+        Non mostrare quantità riservata e quantità minima
         """, stream=True
     )
     output = output.replace("**", "")
@@ -49,8 +49,8 @@ def create_new_product(tool_input, cat):
     product_qty = float(product_qty.replace(" ", ""))
     product_min_qty = (product_min_qty.replace(" ", ""))
     product_description = cat.llm(
-        f"Genera una descrizione per il prodotto farmaceutico che si chiama {product_name}"
-    )
+        f"Genera una descrizione per il prodotto farmaceutico che si chiama {product_name} formattata in HTML"
+    ).replace("```html", "").replace("```", "")
     
     result, link = create_product(product_name, product_qty, product_min_qty, product_description)
     if result:
