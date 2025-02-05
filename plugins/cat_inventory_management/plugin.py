@@ -1,6 +1,8 @@
 from cat.mad_hatter.decorators import tool, hook
-from .utili import connect, get_warehouse, create_product
+from .utili import connect, get_warehouse, create_product, send_mail, send_telegram_notification, create_supplier
 import pandas as pd
+from pydantic import BaseModel, constr
+from cat.experimental.form import CatForm, CatFormState, form
 
 @tool(
     return_direct=True,
@@ -13,7 +15,7 @@ import pandas as pd
 def get_the_warehouse_status(tool_input, cat):
     """Rispondi a "Qual è lo stato del mio magazzino", e domande simili. Input è sempre None.."""
 
-    mark = get_warehouse()
+    mark, _ = get_warehouse()
     
     output = cat.llm(
         f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione adeguata e senza usare tabelle, i dati contenuti in questa tabella:
@@ -59,4 +61,98 @@ def create_new_product(tool_input, cat):
     else:
         return "Non ho potuto creare il prodotto"
     
+@tool(
+    return_direct=True,
+    examples=["Invia una mail al responsabile di magazzino"]
+)
+def send_mail_to_wh_manager(tool_input, cat):
+    """Invia una mail per notificare i prodotti che stanno per finire al responsabile di magazzino
+    """
+    _ , df = get_warehouse()
+    df["Quantità Da Riordinare"] = df["Quantità Disponibile"] - df["Quantità Riservata"] - df["Quantità Minima di Riordino"]
+    df_qty_da_ordinare = df[df["Quantità Da Riordinare"] < 0]
+    df_qty_da_ordinare["Quantità Da Riordinare"] = df_qty_da_ordinare["Quantità Da Riordinare"] * -1
+    df_qty_da_ordinare = df_qty_da_ordinare[["Prodotto", "Quantità Da Riordinare"]]
+
+    df_qty_da_ordinare_mark = df_qty_da_ordinare.to_markdown(index=False)
     
+    mail_text = cat.llm(f"""Prepara il testo di una mail che dica al responsabile di ordinare
+                        i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. 
+                        Formatta con HTML la mail ma scrivendo solo il body della mail.
+                        Inserisci come nome del responsabile Luca Marino. Firmati come il tuo AIbot di Fiducia""").replace("```html", "").replace("```", "")
+    
+    send_mail(mail_text, "Notifica Riordino Prodotti")
+    telegram_text = cat.llm(f"""Prepara il testo di un messaggio telegram che dica al responsabile di ordinare
+                        i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. Formatta la tabella con il tag <code>.
+                        Inserisci come nome del responsabile Luca Marino. Firmati come il tuo AIbot di Fiducia""").replace("```html", "").replace("```", "")
+    send_telegram_notification(telegram_text)
+    return "Mail inviata"
+    
+
+class Supplier(BaseModel):
+    name: constr(min_length=1)  
+    street: str
+    city: str
+    zip: constr(min_length=4, max_length=10)
+    phone: constr(min_length=5, max_length=20)
+    email: str
+
+@form
+class SupplierForm(CatForm):
+    description = "Inserimento di un fornitore"
+    model_class = Supplier
+    start_examples = [
+        "Voglio inserire un nuovo fornitore",
+        "Voglio inserire un fornitore",
+        "Aiutami ad inserire un fornitore",
+        "Aiutami ad inserire un nuovo fornitore",
+        "Aggiungiamo un nuovo fornitore",
+        "Aggiungiamo un fornitore",
+    ]
+    stop_examples = [
+        "Non voglio più inserire il fornitore",
+        "Non voglio più inserire il nuovo fornitore",
+        "Ho finito con l'aggiunta di un nuovo fornitore",
+        "Ho finito con l'inserimento di un nuovo fornitore",
+        "Sì",
+        "Sì puoi inserirlo"
+    ]
+    
+    ask_confirm = True
+
+    def submit(self, form_data):
+        
+        result, link = create_supplier(
+            supplier_name=form_data["name"],
+            supplier_street=form_data["street"],
+            supplier_city=form_data["city"],
+            supplier_zip=form_data["zip"],
+            supplier_phone=form_data["phone"],
+            supplier_email=form_data["email"],
+        )
+        
+        supplier_name = form_data["name"]
+        if result:
+            return {"output": f"Ho creato il fornitore <a href=\"{link}\" target=\"_blank\"> {supplier_name}</a>"} 
+        else:
+            return {"output": "Non ho potuto creare il fornitore"}
+            
+
+    def message_wait_confirm(self):
+        prompt = (
+            "Riassumiamo brevemente i dettagli raccolti:\n"
+            f"{self._generate_base_message()}\n"
+            "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il fornitore nel sistema? Rispondi dicendo Si puoi inserirlo'"
+        )
+        
+        print(self._state)
+        return {"output": f"{self.cat.llm(prompt)}"}
+
+    def message_incomplete(self):
+        prompt = (
+            f"Nel form mancano alcuni dettagli:\n{self._generate_base_message()}\n"
+            """In base a ciò che è ancora necessario,
+            crea un suggerimento per aiutare l'utente a compilare il 
+            form di inserimento del fornitore"""
+        )
+        return {"output": f"{self.cat.llm(prompt)}"}

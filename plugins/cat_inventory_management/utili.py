@@ -1,6 +1,9 @@
 import pandas as pd
 import odoorpc
 import psycopg2 as psql
+import mailslurp_client
+from mailslurp_client import ApiClient, SendEmailOptions
+import telepot
 
 # from config import config
 
@@ -78,7 +81,7 @@ def get_warehouse():
     # Stampa il DataFrame
     mark = df.to_markdown(index=False)
     
-    return mark
+    return mark, df
 
 
 def create_product(product_name, product_qty, product_min_qty, product_description):
@@ -119,4 +122,63 @@ def create_product(product_name, product_qty, product_min_qty, product_descripti
     })
     
     odoo_url = 'http://localhost:8069/web#id={}&model=product.product&view_type=form'.format(new_product_id)
+    return [True, odoo_url]
+
+def send_mail(mail_text, mail_sbj):
+# Configura l'API
+    configuration = mailslurp_client.Configuration()
+    configuration.api_key['x-api-key'] = "5dc12d2c8d8db594054b652023c644844d324a8a3d3694c3a34f7a45283c2dec"
+
+    with ApiClient(configuration) as api_client:
+        api_instance = mailslurp_client.InboxControllerApi(api_client)
+
+        # Crea una email temporanea
+        inbox = api_instance.create_inbox()
+        print(f"Indirizzo email temporaneo: {inbox.email_address}")
+
+        # Invia email dall'inbox creato
+        send_options = SendEmailOptions(
+            to=["marino.luca07@gmail.com"],
+            subject=mail_sbj,
+            body=mail_text,
+            is_html=True
+        )
+
+        api_instance.send_email(inbox.id, send_options)
+
+def send_telegram_notification(telegram_text):
+    TOKEN = '7865121599:AAGWZOQ2Cnmpyr7En0PZC5npYLhSpIQgG5Q'
+    bot = telepot.Bot(TOKEN)
+    bot.sendMessage(119405630, telegram_text, parse_mode="HTML")
+    
+def create_supplier(
+    supplier_name,
+    supplier_street,
+    supplier_city,
+    supplier_zip,
+    supplier_phone,
+    supplier_email,
+): 
+    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  
+
+    db = 'health1'
+    username = 'admin'
+    password = 'admin'
+    odoo.login(db, username, password)
+    
+    Partner = odoo.env['res.partner']
+
+    supplier_id = Partner.create({
+        'name': supplier_name,
+        'street': supplier_street,
+        'city': supplier_city,
+        'zip': supplier_zip,
+        'country_id': 109,
+        'phone': supplier_phone,
+        'email': supplier_email,
+        'supplier_rank': 1,
+        'company_type': 'company',
+    })
+    
+    odoo_url = f'http://localhost:8069/web#id={supplier_id}&model=res.partner&view_type=form'
     return [True, odoo_url]
