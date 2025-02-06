@@ -13,24 +13,64 @@ import json
         "Quali ordini sono stati completati",
         "Quali ordini sono ancora in attesa di approvazione",
         "Quali ordini sono in bozza",
+        "Fammi vedere solo gli ordini in bozza",
+        "Mostrami solo gli ordini confermati",
+        "Mostrami solo gli ordini completati",
+        "Mostrami solo gli ordini in attesa di approvazione",
+        
     ]
 )
 def get_order_status(tool_input, cat):
-    """Rispondi a "Qual è lo stato dei miei ordini", e domande simili. Input è sempre None.."""
-
+    """Rispondi a domande sullo stato degli ordini e filtra per stato se richiesto."""
     mark = get_orders()
-
-    output = cat.llm(
-        f""" Scrivi in modo chiaro per l'utente, applicando una formattazione adeguata i dati contenuti in questa tabella
-            e inoltre completa la tabella con una descrizione per il prodotto in base al nome.
-        {mark}
-
-        Fornisci sempre un riassunto degli ordini. Ad esempio, quanti ordini sono in bozza, quanti sono stati completati, ecc.
-        """, stream = True)
     
-    output = output.replace("**", "")
+    # Se tool_input specifica uno stato, filtriamo gli ordini
+    if tool_input:
+        stato_richiesto = tool_input.lower()
 
-    return output
+        # Chiediamo all'LLM di mappare il termine all'eventuale stato corretto
+        stato_mappato = cat.llm(
+            f"""Se l'utente scrive uno stato dell'ordine (ad esempio "annullati"), restituisci il termine corretto tenendo conto di questa lista di possibili stati:
+            'bozza': 'Bozza',
+            'inviato': 'Inviato',
+            'da approvare': 'Da approvare',
+            'confermato': 'Ordine confermato',
+            'completato': 'Completato',
+            'annullato': 'Annullato', 
+            in modo che l'utente riceva lo stato giusto, come ad esempio "annullato" per "annullati". 
+            L'input che devo mappare è: "{stato_richiesto}".
+            Nel caso sia scritto in inglese traducilo in italiano e poi mappalo.
+            L'OUTPUT DEVE ESSERE SEMPRE E SOLO UNA SINGOLA PAROLA CHE RAPPRESENTA IL TERMINE CORRETTO."""
+        )
+        print("STATO MAPPATO    ", stato_mappato)
+        # Rimuoviamo eventuali spazi e normalizziamo la risposta
+        stato_richiesto = stato_mappato.strip().lower()
+
+        stati_mappa = {
+            'bozza': 'Bozza',
+            'inviato': 'Inviato',
+            'da approvare': 'Da approvare',
+            'confermato': 'Ordine confermato',
+            'completato': 'Completato',
+            'annullato': 'Annullato'
+        }
+
+        stato_filtrato = stati_mappa.get(stato_richiesto)
+        
+        if stato_filtrato:
+            lines = mark.split("\n")
+            header, *rows = lines
+            filtered_rows = [row for row in rows if stato_filtrato in row]
+            mark = "\n".join([header] + filtered_rows) if filtered_rows else "Nessun ordine trovato con stato richiesto."
+    
+    output = cat.llm(
+        f"""Scrivi in modo chiaro per l'utente, applicando una formattazione adeguata i dati contenuti in questa tabella.
+        Completa la tabella con una descrizione per il prodotto in base al nome.
+        Fornisci sempre un riassunto degli ordini.
+        {mark}
+        """, stream=True)
+    
+    return output.replace("**", "")
 
 @tool (
     return_direct=True,
@@ -117,37 +157,51 @@ def crea_ordine_odoo(tool_input: str, cat) -> str:
 
 
     # Creazione ordine
-    return generate_order(partner_id, parsed_order_lines, name, currency_id, company_id, user_id)
+    order_generated = generate_order(partner_id, parsed_order_lines, name, currency_id, company_id, user_id)
+
+    output = cat.llm(
+        f"""Scrivi in modo chiaro per l'utente l'esito della creazione dell'ordine. E riporta in maniera riassuntiva i dettagli dell'ordine:
+        {order_generated}
+        """, stream=True)
+    return output
 
 
 @tool (
     return_direct=True,
     examples=[
-        "Conferma l'ordine con ID 1",
-        "Approva l'ordine 1",
-        "Accetta l'ordine 1",
-        "Conferma l'ordine 1",
-        "Completa l'ordine 1",
-        "Finalizza l'ordine 1",
-        "Concludi l'ordine 1"
+        "Conferma l'ordine con ID 1,2,3",
+        "Approva l'ordine 1,3,4",
+        "Accetta l'ordine 1,2,3",
+        "Conferma l'ordine 1,2,4",
+        "Completa l'ordine 1,5,6",
+        "Finalizza l'ordine 1,3,4",
+        "Concludi l'ordine 1, 2,3"
         ]
 )
 
-def conferma_ordine_odoo(tool_input: str, cat) -> str:
-    """
-    Tool per Cheshire Cat AI: conferma un ordine d'acquisto in Odoo.
+def confirm_orders_tool(tool_input, cat):
+    """Gestisce la conferma di un ordine alla volta, restituendo successi ed errori."""
+    result = []
+    order_ids = tool_input.split(',')
 
-    :param tool_input: ID dell'ordine da confermare.
-    :param cat: Contesto Cheshire Cat (non usato direttamente in questa funzione).
-    :return: Messaggio con l'esito dell'operazione.
-    """
-    try:
-        #TODO aggiungere validazione per l'ID dell'ordine
-        order_id = int(tool_input)
-    except ValueError:
-        return "Errore: l'ID dell'ordine deve essere un intero valido."
+    for order_id in order_ids:
+        try:
+            order_id = int(order_id.strip())
+            result.append(confirm_order(order_id))
+        except ValueError:
+            result.append(f"Errore: ID ordine {order_id} non valido. Inserisci un numero intero.")
+    
+    output = cat.llm(
+        f"""Scrivi in modo chiaro per l'utente i risultati delle conferme degli ordini. 
+        Che sono contenuti in questo elenco. 
+        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
 
-    return confirm_order(order_id)
+        {result}
+        """, stream=True)
+    
+    return output.replace("**", "")
+
+
 
 @tool (
     return_direct=True,
@@ -159,25 +213,32 @@ def conferma_ordine_odoo(tool_input: str, cat) -> str:
         ]
 )
 
-def cancella_ordine_odoo(tool_input: str, cat) -> str:
-    """
-    Tool per Cheshire Cat AI: Cancella più ordini d'acquisto in Odoo.
+def delete_order_tool(tool_input, cat):
+    """Gestisce la cancellazione di un ordine alla volta, restituendo successi ed errori."""
+    result = []
 
-    :param tool_input: Lista di ID degli ordini da cancellare (separati da virgola).
-    :param cat: Contesto Cheshire Cat (non usato direttamente in questa funzione).
-    :return: Messaggio con l'esito dell'operazione.
-    """
-    try:
-        # Converte la stringa di input in una lista di interi
-        order_ids = [int(order_id.strip()) for order_id in tool_input.split(',')]
-    except ValueError:
-        return "Errore: tutti gli ID degli ordini devono essere interi validi."
-
-    # Cancella gli ordini uno per uno
+    words = tool_input.split()
+    # Rimuove eventuali virgole o altri caratteri non numerici
+    cleaned_words = [word.strip(",.").isdigit() and word.strip(",.") or None for word in words]
+    
+    # Filtra le parole, considerando solo quelle che sono numeri
+    order_ids = [word for word in cleaned_words if word is not None]
     for order_id in order_ids:
-        delete_order(order_id)
+        try:
+            order_id = int(order_id.strip())
+            result.append(delete_order(order_id))
+        except ValueError:
+            result.append(f"Errore: ID ordine {order_id} non valido. Inserisci un numero intero.")
+    
+    output = cat.llm(
+        f"""Scrivi in modo chiaro per l'utente i risultati delle cancellazioni degli ordini. 
+        Che sono contenuti in questo elenco. 
+        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
 
-    return f"{len(order_ids)} ordine/i cancellato/i con successo."
+        {result}
+        """, stream=True)
+    
+    return output.replace("**", "")
 
 @tool(
     return_direct=True,

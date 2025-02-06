@@ -28,24 +28,18 @@ from rapidfuzz import process, fuzz
 
 
 def get_orders():
+    """Recupera gli ordini da Odoo e restituisce una tabella formattata."""
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-
-    # Autenticazione
     db = 'db_test'
     username = 'prova@prova'
     password = 'password'
     odoo.login(db, username, password)
-
-    # Modelli Odoo
+    
     PurchaseOrder = odoo.env['purchase.order']
-
-    # Recupero ordini con ID, nome e stato
     orders = PurchaseOrder.search_read([], ['id', 'name', 'state'])
-
-    # Creazione DataFrame
+    
     df = pd.DataFrame(orders)
-
-    # Mappa gli stati di Odoo a descrizioni più leggibili
+    
     state_mapping = {
         'draft': 'Bozza',
         'sent': 'Inviato',
@@ -56,11 +50,8 @@ def get_orders():
     }
     
     df['state'] = df['state'].map(state_mapping).fillna('Sconosciuto')
+    return df.to_markdown(index=False)
 
-    # Stampa il DataFrame in formato markdown
-    mark = df.to_markdown(index=False)
-    
-    return mark
 
 
 def get_partner_id_by_name(partner_name):
@@ -90,7 +81,7 @@ def get_product_by_name(product_name):
     Product = odoo.env['product.product']
     
     products = Product.search_read([], ['id', 'list_price', 'name'])
-
+    
     if not products:
         return None
     
@@ -98,10 +89,10 @@ def get_product_by_name(product_name):
     product_names = [product['name'] for product in products]
 
     # Ricerca fuzzy per trovare i prodotti simili
-    matches = process.extract(product_name, product_names, scorer=fuzz.ratio, limit=10)  # Prendiamo fino a 5 migliori risultati
-    
+    matches = process.extract(product_name, product_names, scorer=fuzz.ratio, limit=10)  # Prendiamo fino a 10 migliori risultati
+    print("MATCHES: ", matches)
     # Controlla se esiste un match con score >= 90
-    best_match = next((match[0] for match in matches if match[1] >= 90), None)
+    best_match = next((match[0] for match in matches if match[1] >= 80), None)
 
     if best_match:
         # Troviamo il prodotto esatto
@@ -128,6 +119,9 @@ def get_product_by_name(product_name):
     }
 
 
+from datetime import datetime
+import odoorpc
+
 def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1, user_id=2):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  
 
@@ -143,6 +137,7 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
     
     current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    # Creazione dell'ordine di acquisto
     order_id = PurchaseOrder.create({
         'partner_id': partner_id,
         'currency_id': currency_id,
@@ -153,9 +148,12 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
         'amount_total': sum(qty * price for _, qty, price in order_lines),
         'name': name,
     })
-    
+
+    order_lines_data = []
+
+    # Creazione delle linee d'ordine
     for product_id, product_qty, price_unit in order_lines:
-        PurchaseOrderLine.create({
+        line_id = PurchaseOrderLine.create({
             'order_id': order_id,
             'product_id': product_id,
             'product_qty': product_qty,
@@ -164,29 +162,101 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
             'price_total': product_qty * price_unit,
             'date_planned': current_datetime,
         })
+        
+        # Salviamo i dettagli della riga ordine
+        order_lines_data.append({
+            'line_id': line_id,
+            'product_id': product_id,
+            'product_qty': product_qty,
+            'price_unit': price_unit,
+            'price_subtotal': product_qty * price_unit
+        })
+
+    # Recuperiamo i dettagli dell'ordine creato
+    order_details = PurchaseOrder.browse(order_id)
     
-    return f"Ordine creato con ID: {order_id}"
+    # Creiamo il dizionario con tutte le informazioni
+    result = {
+        "order_id": order_id,
+        "name": order_details.name,
+        "partner_id": order_details.partner_id[0] if order_details.partner_id else None,
+        "partner_name": order_details.partner_id.name if order_details.partner_id else None,
+        "currency_id": order_details.currency_id[0] if order_details.currency_id else None,
+        "currency_name": order_details.currency_id.name if order_details.currency_id else None,
+        "company_id": order_details.company_id[0] if order_details.company_id else None,
+        "company_name": order_details.company_id.name if order_details.company_id else None,
+        "user_id": order_details.user_id[0] if order_details.user_id else None,
+        "user_name": order_details.user_id.name if order_details.user_id else None,
+        "date_order": order_details.date_order,
+        "amount_total": order_details.amount_total,
+        "state": order_details.state,
+        "order_lines": order_lines_data
+    }
+
+    return result
+
 
 
 
 def confirm_order(order_id):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-
+    
     # Autenticazione
     db = 'db_test'
     username = 'prova@prova'
     password = 'password'
     odoo.login(db, username, password)
+    
+    PurchaseOrder = odoo.env['purchase.order']
+    
+    try:
+        order = PurchaseOrder.browse(order_id)
+        if not order.exists():
+            return f"Errore: Ordine ID {order_id} non trovato."
+        
+        if order.state != 'draft':  # Assumiamo che 'draft' corrisponda a 'Bozza'
+            return f"Errore: Ordine ID {order_id} non in stato 'Bozza' ma '{order.state}'."
+        
+        # Conferma l'ordine
+        order.write({
+            'state': 'purchase',
+            'date_approve': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+        return f"Successo: Ordine ID {order_id} confermato con successo."
+    
+    except Exception as e:
+        return f"Errore: impossibile confermare l'ordine ID {order_id}. Dettaglio: {str(e)}"
 
-    # Ottieni il record del PurchaseOrder
-    purchase_order = odoo.env['purchase.order'].browse(order_id)  # Sostituisci con l'ID del tuo PurchaseOrder
 
-    # Modifica lo stato e la data di approvazione
-    purchase_order.write({
-    'state': 'purchase',  # Imposta lo stato su 'purchase'
-    'date_approve': datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Imposta la data di approvazione
-})
-    return f"Ordine con ID {order_id} confermato con successo."
+def delete_order(order_id):
+    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
+    
+    # Autenticazione
+    db = 'db_test'
+    username = 'prova@prova'
+    password = 'password'
+    odoo.login(db, username, password)
+    
+    PurchaseOrder = odoo.env['purchase.order']
+    
+    try:
+        order = PurchaseOrder.browse(order_id)
+        if not order.exists():
+            return f"Errore: Ordine ID {order_id} non trovato."
+        
+        if order.state != 'draft':  # Assumiamo che 'draft' corrisponda a 'Bozza'
+            return f"Errore: Ordine ID {order_id} non in stato 'Bozza' ma '{order.state}'."
+        
+        # Conferma l'ordine
+        order.write({
+            'state': 'cancel',
+        })
+        return f"Successo: Ordine ID {order_id} cancellato con successo."
+    
+    except Exception as e:
+        return f"Errore: impossibile cancellare l'ordine ID {order_id}. Dettaglio: {str(e)}"
+
+
 
 def auto_order():
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
@@ -232,22 +302,5 @@ def auto_order():
     
     return mark
 
-def delete_order(order_id):
-    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
-    odoo.login(db, username, password)
-
-     # Ottieni il record del PurchaseOrder
-    purchase_order = odoo.env['purchase.order'].browse(order_id)  # Sostituisci con l'ID del tuo PurchaseOrder
-
-    # Modifica lo stato e la data di approvazione
-    purchase_order.write({
-    'state': 'cancel',  # Imposta lo stato su 'purchase'
-    })
-    return f"Ordine con ID {order_id} cancellato con successo."
 
 
