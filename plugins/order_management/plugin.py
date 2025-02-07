@@ -1,5 +1,5 @@
 from cat.mad_hatter.decorators import tool, hook
-from .utils import get_orders, generate_order, confirm_order, auto_order, get_partner_id_by_name, get_product_by_name, delete_order
+from .utils import get_orders, generate_order, confirm_order, auto_order, get_partner_id_by_name, get_product_by_name, delete_order, complete_order
 import json
 
 @tool(
@@ -180,7 +180,7 @@ def crea_ordine_odoo(tool_input: str, cat) -> str:
 )
 
 def confirm_orders_tool(tool_input, cat):
-    """Gestisce la conferma di un ordine alla volta, restituendo successi ed errori."""
+    """Gestisce la conferma di uno o più più ordini, restituendo successi ed errori."""
     result = []
     order_ids = tool_input.split(',')
 
@@ -201,7 +201,37 @@ def confirm_orders_tool(tool_input, cat):
     
     return output.replace("**", "")
 
+@tool (
+    return_direct=True,
+    examples=[
+        "Completa l'ordine con ID 1,2,3",
+        "Finalizza l'ordine 1,3,4",
+        "Concludi l'ordine 1,2,3",
+        "Chiudi l'ordine 1,2,4",
+        "Termina l'ordine 1,5,6"
+    ]
+)
+def complete_orders_tool(tool_input, cat):
+    """Gestisce la chiusura di uno o più ordini, restituendo successi ed errori."""
+    result = []
+    order_ids = tool_input.split(',')
 
+    for order_id in order_ids:
+        try:
+            order_id = int(order_id.strip())
+            result.append(complete_order(order_id))
+        except ValueError:
+            result.append(f"Errore: ID ordine {order_id} non valido. Inserisci un numero intero.")
+    
+    output = cat.llm(
+        f"""Scrivi in modo chiaro per l'utente i risultati della chiusura degli ordini. 
+        Che sono contenuti in questo elenco. 
+        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
+
+        {result}
+        """, stream=True)
+    
+    return output.replace("**", "")
 
 @tool (
     return_direct=True,

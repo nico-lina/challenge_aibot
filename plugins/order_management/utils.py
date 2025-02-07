@@ -208,6 +208,7 @@ def confirm_order(order_id):
     odoo.login(db, username, password)
     
     PurchaseOrder = odoo.env['purchase.order']
+    StockMove = odoo.env['stock.move']
     
     try:
         order = PurchaseOrder.browse(order_id)
@@ -222,10 +223,72 @@ def confirm_order(order_id):
             'state': 'purchase',
             'date_approve': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
-        return f"Successo: Ordine ID {order_id} confermato con successo."
+        
+        # Trova i movimenti di magazzino associati
+        moves = StockMove.search([('purchase_line_id', 'in', order.order_line.ids), ('state', '=', 'draft')])
+        
+        # Aggiorna lo stato dei movimenti di magazzino e aumenta la quantità prevista
+        if moves:
+            move_records = StockMove.browse(moves)
+            move_records.write({'state': 'confirmed'})
+            for move in move_records:
+                move.write({'product_uom_qty': move.product_uom_qty + move.product_uom_qty})
+        
+        return f"Successo: Ordine ID {order_id} confermato, movimenti di magazzino aggiornati e quantità prevista aumentata."
     
     except Exception as e:
         return f"Errore: impossibile confermare l'ordine ID {order_id}. Dettaglio: {str(e)}"
+
+
+
+def complete_order(order_id):
+    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
+    
+    # Autenticazione
+    db = 'db_test'
+    username = 'prova@prova'
+    password = 'password'
+    odoo.login(db, username, password)
+    
+    PurchaseOrder = odoo.env['purchase.order']
+    StockQuant = odoo.env['stock.quant']
+    
+    try:
+        order = PurchaseOrder.browse(order_id)
+        if not order.exists():
+            return f"Errore: Ordine ID {order_id} non trovato."
+        
+        if order.state != 'purchase':  
+            return f"Errore: Ordine ID {order_id} non in stato 'Acquistato' ma '{order.state}'."
+        
+        # Aggiorna direttamente la quantità disponibile dei prodotti in magazzino
+        for line in order.order_line:
+            product = line.product_id
+            location_id = order.picking_type_id.default_location_dest_id.id  # Magazzino di destinazione
+            
+            if not location_id:
+                return f"Errore: Nessun magazzino di destinazione trovato per l'ordine {order_id}."
+            
+            quant = StockQuant.search([('product_id', '=', product.id), ('location_id', '=', location_id)])
+            
+            if quant:
+                quant_record = StockQuant.browse(quant[0])
+                quant_record.write({'quantity': quant_record.quantity + line.product_qty})
+            else:
+                # Se non esiste una riga stock.quant per questo prodotto e magazzino, la creiamo
+                StockQuant.create({
+                    'product_id': product.id,
+                    'location_id': location_id,
+                    'quantity': line.product_qty
+                })
+        
+        # Segna l'ordine come completato
+        order.write({'state': 'done'})
+        
+        return f"Successo: Ordine ID {order_id} completato e quantità di prodotto aggiornata in magazzino."
+    
+    except Exception as e:
+        return f"Errore: impossibile completare l'ordine ID {order_id}. Dettaglio: {str(e)}"
 
 
 def delete_order(order_id):
