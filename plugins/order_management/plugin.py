@@ -78,100 +78,6 @@ def get_order_status(tool_input, cat):
     
     return output.replace("**", "")
 
-# @tool (
-#     return_direct=True,
-#     examples=[
-#         "Crea un ordine d'acquisto per 5 unità di Lampade da ufficio e 10 unità di Scaffali",
-#         "Vorrei ordinare 5 unità di Lampade da ufficio e 10 unità di Scaffali",
-#         "Ordina 5 Lampade da ufficio e 10 unità di Scaffali"
-#         ]
-# )
-
-# def crea_ordine_odoo(tool_input: str, cat) -> str:
-#     """
-#     Tool per Cheshire Cat AI: crea un ordine d'acquisto in Odoo con le linee in purchase_order_line.
-
-#     :param tool_input: Stringa JSON contenente i parametri:
-#         - partner_name (str): Nome del fornitore.
-#         - order_lines (list): Lista di dizionari con 'product_name' e 'product_qty'.
-#         - name (str): Nome dell'oggetto da ordinare.
-#         - currency_id (int, opzionale): ID della valuta usata (default: 1).
-#         - company_id (int, opzionale): ID dell'azienda (default: 1).
-#         - user_id (int, opzionale): ID dell'utente che crea l'ordine (default: 1).
-    
-#     :param cat: Contesto Cheshire Cat (non usato direttamente in questa funzione).
-#     :return: Messaggio con l'ID dell'ordine o errore.
-#     """
-#     try:
-#         # Convertiamo la stringa JSON in un dizionario
-#         data = json.loads(tool_input)
-#     except json.JSONDecodeError:
-#         return "Errore: il tool_input non è in un formato JSON valido."
-
-#     # Estrazione parametri
-#     partner_name = data.get("partner_name")
-#     order_lines = data.get("order_lines")
-#     name = data.get("name")
-#     currency_id = data.get("currency_id", 1)
-#     company_id = data.get("company_id", 1)
-#     user_id = data.get("user_id", 2)
-
-#     # Validazione input
-#     if not isinstance(partner_name, str) or not partner_name.strip():
-#         return "Errore: 'partner_name' deve essere una stringa valida."
-
-#     # Recupero dell'ID del fornitore da Odoo
-#     partner_id = get_partner_id_by_name(partner_name)
-#     if partner_id is None:
-#         return f"Errore: Il fornitore '{partner_name}' non esiste."
-   
-#     if not isinstance(order_lines, list) or not all(isinstance(item, dict) for item in order_lines):
-#         return "Errore: 'order_lines' deve essere una lista di dizionari contenenti 'product_name' e 'product_qty'."
-    
-#     if not isinstance(name, str):
-#         return "Errore: 'name' deve essere una stringa valida."
-
-#     # Recupero degli ID dei prodotti e prezzi dal database
-#     parsed_order_lines = []
-#     for item in order_lines:
-#         product_name = item.get("product_name")
-#         product_qty = item.get("product_qty")
-
-#         if not isinstance(product_name, str) or not product_name.strip():
-#             return "Errore: 'product_name' deve essere una stringa valida."
-#         if not isinstance(product_qty, (int, float)) or product_qty <= 0:
-#             return f"Errore: 'product_qty' per '{product_name}' deve essere un numero positivo."
-
-#         product_data = get_product_by_name(product_name)
-        
-#         # Se il prodotto non esiste, errore
-#         if product_data is None:
-#             return f"Errore: Il prodotto '{product_name}' non esiste."
-        
-#         # Se ci sono più prodotti simili, restituiamo la lista e chiediamo all'utente di specificare
-#         if "multiple_matches" in product_data:
-#             match_list = "\n".join(
-#                 [f"- {prod['name']} (ID: {prod['id']}, Prezzo: {prod['price']}€)" for prod in product_data["multiple_matches"]]
-#             )
-#             return f"Errore: '{product_name}' corrisponde a più prodotti. Scegli uno tra:\n{match_list}"
-
-#         # Se è un solo prodotto, procediamo con l'ordine
-#         product_id = product_data["id"]
-#         price_unit = product_data["price"]
-
-#         parsed_order_lines.append((product_id, product_qty, price_unit))
-
-
-#     # Creazione ordine
-#     order_generated = generate_order(partner_id, parsed_order_lines, name, currency_id, company_id, user_id)
-
-#     output = cat.llm(
-#         f"""Scrivi in modo chiaro per l'utente l'esito della creazione dell'ordine. E riporta in maniera riassuntiva i dettagli dell'ordine:
-#         {order_generated}
-#         """, stream=True)
-#     return output
-
-
 
 class OrderLine(BaseModel):
     product: str = Field(..., description = "Nome del prodotto da ordinare")
@@ -195,6 +101,7 @@ class OrderLine(BaseModel):
 class Order(BaseModel):
     supplier_name: str = Field(...)
     order_lines: list[OrderLine] 
+    currency : int = 125
 
     @validator("supplier_name")
     @classmethod
@@ -215,28 +122,24 @@ class OrderForm(SuperCatForm):
     def submit(self, form_data):
         supplier_name = form_data['supplier_name']
         order_lines = form_data['order_lines']
-        
+        currency = form_data['currency']
+
         partner_id = get_partner_id_by_name(supplier_name)
         if partner_id is None:
-            print("QUI1")
             return {"output": f"Errore: Il fornitore '{supplier_name}' non esiste."}
         
         order_lines_data = []
         for line in order_lines:
-            print("LINE", line)
             product_data = get_product_by_name(line["product"])
-            print("PRODUCT DATA", product_data)
             if not product_data:
-                print("QUI2")
                 return {"output": f"Errore: Il prodotto '{line['product']}' non esiste."}
             order_lines_data.append((product_data['id'], line["quantity"], product_data['price'], product_data['name']))
         nome_ordine = f"In base alle informazioni dei prodotti forniti: {order_lines_data}, crea un nome per l'ordine. Per esempio Ordine per {line['product']}, IN OUTPUT VOGLIO SOLO UNA STRINGA CON IL NOME DELL'ORDINE"
-        print("NOME ORDINE", nome_ordine)
         result = generate_order(
             partner_id=partner_id,
             order_lines=order_lines_data,
             name= self.cat.llm(nome_ordine),
-            currency_id=1  # Imposta l'ID della valuta corretta se necessario
+            currency_id=currency  # Imposta l'ID della valuta corretta se necessario
         )
         prompt = (f"Scrivi che l'ordine è stato creato correttamente e scrivi in maniera riassuntiva i dettagli dell'ordine:\n{result}")
         return {"output": f"{self.cat.llm(prompt)}"}
