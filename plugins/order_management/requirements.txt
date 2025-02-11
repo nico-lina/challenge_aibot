@@ -2,3 +2,5 @@ pandas
 psycopg2-binary
 tabulate
 odoorpc
+pydantic
+word2number

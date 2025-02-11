@@ -65,7 +65,7 @@ def get_partner_id_by_name(partner_name):
 
     Partner = odoo.env['res.partner']
     partners = Partner.search_read([('name', '=', partner_name)], ['id'])
-
+    print("PARTNER:", partners)
     return partners[0]['id'] if partners else None
 
 
@@ -99,18 +99,19 @@ def get_product_by_name(product_name):
         matched_product = next(prod for prod in products if prod['name'] == best_match)
         return {
             "id": matched_product["id"],
+            "name": matched_product["name"],
             "price": matched_product["list_price"]
         }
     
     # Se nessun match supera 90, filtra quelli con score > 50
-    valid_matches = [match[0] for match in matches if match[1] > 50]
+    valid_matches = [match[0] for match in matches if match[1] > 45]
 
     if not valid_matches:
         return None
     
     # Troviamo i prodotti corrispondenti nel database
     matched_products = [prod for prod in products if prod['name'] in valid_matches]
-
+    
     return {
         "multiple_matches": [
             {"id": prod["id"], "name": prod["name"], "price": prod["list_price"]}
@@ -119,12 +120,11 @@ def get_product_by_name(product_name):
     }
 
 
-from datetime import datetime
-import odoorpc
-
-def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1, user_id=2):
-    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  
-
+def generate_order(partner_id, order_lines, name, currency_id, company_id=1, user_id=2):
+    odoo = odoorpc.ODOO('host.docker.internal', port=8069)
+    print("Partner id", partner_id)
+    print("Order lines", order_lines)
+    print("Name", name)
     # Autenticazione
     db = 'db_test'
     username = 'prova@prova'
@@ -134,7 +134,7 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
     # Modelli Odoo
     PurchaseOrder = odoo.env['purchase.order']
     PurchaseOrderLine = odoo.env['purchase.order.line']
-    
+
     current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # Creazione dell'ordine di acquisto
@@ -143,16 +143,17 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
         'currency_id': currency_id,
         'company_id': company_id,
         'user_id': user_id,
+        'company_id': company_id,
         'state': 'draft',
         'date_order': current_datetime,
-        'amount_total': sum(qty * price for _, qty, price in order_lines),
+        'amount_total': sum(qty * price for _, qty, price,_ in order_lines),
         'name': name,
     })
 
     order_lines_data = []
 
     # Creazione delle linee d'ordine
-    for product_id, product_qty, price_unit in order_lines:
+    for product_id, product_qty, price_unit, _ in order_lines:
         line_id = PurchaseOrderLine.create({
             'order_id': order_id,
             'product_id': product_id,
@@ -162,30 +163,31 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
             'price_total': product_qty * price_unit,
             'date_planned': current_datetime,
         })
-        
-        # Salviamo i dettagli della riga ordine
+
+        # Salviamo i dettagli delle righe ordine
         order_lines_data.append({
             'line_id': line_id,
             'product_id': product_id,
             'product_qty': product_qty,
             'price_unit': price_unit,
-            'price_subtotal': product_qty * price_unit
+            'price_subtotal': product_qty * price_unit,
+            'quantity_received_manual': 0
         })
 
     # Recuperiamo i dettagli dell'ordine creato
     order_details = PurchaseOrder.browse(order_id)
-    
+
     # Creiamo il dizionario con tutte le informazioni
     result = {
         "order_id": order_id,
         "name": order_details.name,
-        "partner_id": order_details.partner_id[0] if order_details.partner_id else None,
+        "partner_id": order_details.partner_id.id if order_details.partner_id else None,
         "partner_name": order_details.partner_id.name if order_details.partner_id else None,
-        "currency_id": order_details.currency_id[0] if order_details.currency_id else None,
+        "currency_id": order_details.currency_id.id if order_details.currency_id else None,
         "currency_name": order_details.currency_id.name if order_details.currency_id else None,
-        "company_id": order_details.company_id[0] if order_details.company_id else None,
+        "company_id": order_details.company_id.id if order_details.company_id else None,
         "company_name": order_details.company_id.name if order_details.company_id else None,
-        "user_id": order_details.user_id[0] if order_details.user_id else None,
+        "user_id": order_details.user_id.id if order_details.user_id else None,
         "user_name": order_details.user_id.name if order_details.user_id else None,
         "date_order": order_details.date_order,
         "amount_total": order_details.amount_total,
@@ -198,46 +200,45 @@ def generate_order(partner_id, order_lines, name, currency_id=125, company_id=1,
 
 
 
-def confirm_order(order_id):
-    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
-    odoo.login(db, username, password)
-    
-    PurchaseOrder = odoo.env['purchase.order']
-    StockMove = odoo.env['stock.move']
-    
-    try:
-        order = PurchaseOrder.browse(order_id)
-        if not order.exists():
-            return f"Errore: Ordine ID {order_id} non trovato."
+
+# def confirm_order(order_id):
+#     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
+
+#     # Autenticazione
+#     db = 'db_test'
+#     username = 'prova@prova'
+#     password = 'password'
+#     odoo.login(db, username, password)
+
+#     PurchaseOrder = odoo.env['purchase.order']
+#     StockMove = odoo.env['stock.move']
+
+#     try:
+#         order = PurchaseOrder.browse(order_id)
+#         if not order.exists():
+#             return f"Errore: Ordine ID {order_id} non trovato."
+
+#         if order.state != 'draft':  # Assumiamo che 'draft' corrisponda a 'Bozza'
+#             return f"Errore: Ordine ID {order_id} non in stato 'Bozza' ma '{order.state}'."
+
+#         # Conferma l'ordine
+#         order.write({
+#             'state': 'purchase',
+#             'date_approve': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+#         })
+
+#         # Trova i movimenti di magazzino associati
+#         moves = StockMove.search([('purchase_line_id', 'in', order.order_line.ids), ('state', '=', 'draft')])
+#         print("MOVES: ", moves)
+#         # Aggiorna lo stato dei movimenti di magazzino per essere conteggiati nella quantità prevista
+#         if moves:
+#             move_records = StockMove.browse(moves)
+#             move_records.write({'state': 'assigned', 'location_final_id': 8, 'picking_id':16, 'group_id':4, 'picking_type_id':1, 'warehouse_id': 1, 'quantity':10, 'price_unit' : 1000 })  # Imposta lo stato come 'confirmed' senza modificare la quantità
         
-        if order.state != 'draft':  # Assumiamo che 'draft' corrisponda a 'Bozza'
-            return f"Errore: Ordine ID {order_id} non in stato 'Bozza' ma '{order.state}'."
-        
-        # Conferma l'ordine
-        order.write({
-            'state': 'purchase',
-            'date_approve': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
-        
-        # Trova i movimenti di magazzino associati
-        moves = StockMove.search([('purchase_line_id', 'in', order.order_line.ids), ('state', '=', 'draft')])
-        
-        # Aggiorna lo stato dei movimenti di magazzino e aumenta la quantità prevista
-        if moves:
-            move_records = StockMove.browse(moves)
-            move_records.write({'state': 'confirmed'})
-            for move in move_records:
-                move.write({'product_uom_qty': move.product_uom_qty + move.product_uom_qty})
-        
-        return f"Successo: Ordine ID {order_id} confermato, movimenti di magazzino aggiornati e quantità prevista aumentata."
-    
-    except Exception as e:
-        return f"Errore: impossibile confermare l'ordine ID {order_id}. Dettaglio: {str(e)}"
+#         return f"Successo: Ordine ID {order_id} confermato e movimenti di magazzino aggiornati."
+
+#     except Exception as e:
+#         return f"Errore: impossibile confermare l'ordine ID {order_id}. Dettaglio: {str(e)}"
 
 
 
