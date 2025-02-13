@@ -3,29 +3,6 @@ import odoorpc
 import psycopg2 as psql
 from datetime import datetime
 from rapidfuzz import process, fuzz
-# from config import config
-
-# def connect(db):
-#     """ Connect to the PostgreSQL database server """
-#     conn = None
-#     try:
-#         # read connection parameters
-       
-#         # params = config(section=db)
-#         params = {'host': 'host.docker.internal', 'database': 'db_test', 'user': 'odoo', 'password': 'password', 'port': '5433'}
-
-#         # connect to the PostgreSQL server
-#         print('Connecting to the PostgreSQL database...')
-#         conn = psql.connect(**params)
-
-#         return conn
-#     except (Exception, psql.DatabaseError) as error:
-#         print(error)
-#     finally:
-#         if conn is not None:
-#             conn.close()
-#             print('Database connection closed.')
-
 
 def get_orders():
     """Recupera gli ordini da Odoo e restituisce una tabella formattata."""
@@ -367,4 +344,53 @@ def auto_order():
     return mark
 
 
+def get_order_details(order_id):
+    odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
+    
+    # Autenticazione
+    db = 'db_test'
+    username = 'prova@prova'
+    password = 'password'
+    odoo.login(db, username, password)
 
+    # Modello Odoo
+    PurchaseOrder = odoo.env['purchase.order']
+    PurchaseOrderLine = odoo.env['purchase.order.line']
+    
+    # Recupero ordine
+    order = PurchaseOrder.browse(order_id)
+    if not order:
+        return {"error": "Ordine non trovato"}
+    
+    # Recupero linee d'ordine
+    order_lines_data = []
+    for line in order.order_line:
+        order_lines_data.append({
+            'line_id': line.id,
+            'product_id': line.product_id.id,
+            'product_name': line.product_id.name,
+            'product_qty': line.product_qty,
+            'price_unit': line.price_unit,
+            'price_subtotal': line.price_subtotal,
+            'quantity_received_manual': line.quantity_received_manual
+        })
+    
+    # Creazione del risultato
+    result = {
+        "order_id": order.id,
+        "name": order.name,
+        "partner_id": order.partner_id.id if order.partner_id else None,
+        "partner_name": order.partner_id.name if order.partner_id else None,
+        "currency_id": order.currency_id.id if order.currency_id else None,
+        "currency_name": order.currency_id.name if order.currency_id else None,
+        "company_id": order.company_id.id if order.company_id else None,
+        "company_name": order.company_id.name if order.company_id else None,
+        "user_id": order.user_id.id if order.user_id else None,
+        "user_name": order.user_id.name if order.user_id else None,
+        "date_order": order.date_order,
+        "amount_total": order.amount_total,
+        "state": order.state,
+        "order_lines": order_lines_data
+    }
+    
+    return result

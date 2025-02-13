@@ -1,12 +1,14 @@
 from cat.mad_hatter.decorators import tool
 from cat.experimental.form import CatForm, form
-from .utils import get_orders, generate_order, auto_order, delete_order, complete_order, get_partner_id_by_name, get_product_by_name
+from .utils import get_orders, generate_order, auto_order, delete_order, complete_order, get_partner_id_by_name, get_product_by_name, get_order_details
 import json
 from pydantic import BaseModel, constr, validator, Field, root_validator
 import re
 import word2number as w2n
 from cat.plugins.super_cat_form.super_cat_form import SuperCatForm, form_tool, super_cat_form
 from cat.plugins.super_cat_form.super_cat_form_events import FormEvent, FormEventContext
+
+
 
 @tool(
     return_direct=True,
@@ -26,6 +28,7 @@ from cat.plugins.super_cat_form.super_cat_form_events import FormEvent, FormEven
         
     ]
 )
+
 def get_order_status(tool_input, cat):
     """Rispondi a domande sullo stato degli ordini e filtra per stato se richiesto."""
     mark = get_orders()
@@ -248,7 +251,7 @@ def delete_order_tool(tool_input, cat):
     result = []
 
     words = tool_input.split()
-    print("WORDS", words)
+    
    
     # Filtra le parole, considerando solo quelle che sono numeri
     order_ids = [num for word in words for num in re.findall(r'\d+', word)]
@@ -303,3 +306,27 @@ def get_products_to_reorder(tool_input, cat):
     output = output.replace("**", "")
 
     return output
+
+@tool(
+    return_direct=True,
+    examples=[ "Dimmi i dettagli dell'ordine 1",
+                "Mostrami i dettagli dell'ordine 1",
+                "Dammi i dettagli dell'ordine 1"
+    ])
+
+def get_order_details_tool(tool_input, cat):
+    """Restituisci i dettagli di un ordine specifico."""
+    order_id = int(tool_input)
+    print("ORDER ID", order_id)
+    order_details = get_order_details(order_id)
+    if not order_details:
+        return f"Errore: l'ordine con ID {order_id} non esiste. Inserisci un ID valido."
+    
+    output = cat.llm(
+        f"""Scrivi in modo chiaro per l'utente i dettagli dell'ordine con ID {order_id}. 
+        Completa la tabella con una descrizione per il prodotto in base al nome.
+        Fornisci sempre un riassunto degli ordini.
+        {order_details}
+        """, stream=True)
+    
+    return output.replace("**", "")
