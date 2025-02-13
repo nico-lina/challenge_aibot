@@ -1,5 +1,4 @@
 from cat.mad_hatter.decorators import tool
-from cat.experimental.form import CatForm, form
 from .utils import get_orders, generate_order, auto_order, delete_order, complete_order, get_partner_id_by_name, get_product_by_name, get_order_details
 import json
 from pydantic import BaseModel, constr, validator, Field, root_validator
