@@ -1,0 +1,66 @@
+import pandas as pd
+import numpy as np
+from cat.mad_hatter.decorators import tool
+from .utils import predict_future_demand, suggest_reorder_date
+
+
+@tool(
+    return_direct=True,
+    examples=[
+        "Quanto venderò del prodotto x nei prossimi 6 mesi?",
+        "Rispetto alla vendita dei mesi precedenti, quanto venderò per ogni prodotto nei prossimi 6 mesi?"
+    ]
+)
+def predict_quantity(tool_input, cat):
+    """Rispondi a "Quante unità venderò di un prodotto" e domande simili"""
+
+    mesi_input = cat.llm(
+        f""" Da {tool_input} estrai il numero di mesi per cui fare la previsione.
+        L'OUTPUT DEVE ESSERE UN NUMERO INTERO.
+        """,
+        stream=True
+    )
+
+    print("MESI", mesi_input)
+    prodotto_input = cat.llm(
+        f""" Da {tool_input} estrai il nome del prodotto per cui fare la previsione.
+        L'OUTPUT DEVE ESSERE UNA STRINGA.
+        """,
+        stream=True
+    )
+
+    mark = predict_future_demand(prodotto_input, mesi_input)
+
+    output = cat.llm(
+        f""" Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per prodotto che farai
+        
+        {mark}
+
+        Metti in evidenza le quantità previste mese per mese
+        """, stream=True
+    )
+
+    return output
+
+
+@tool(
+    return_direct=True,
+    examples=[
+        "Entro quando devo ordinare il prodotto 1 per non andare sotto la soglia minima?",
+        "Quanti prodotti mancano per raggiungere la soglia minima? Devo riordinare?",
+        "Quando esaurirò il prodotto 1? Dimmi data di riordino stimata"
+    ]
+)
+def predict_date(tool_input, cat):
+    """Rispondi a "Quando dovrò riordinare i prodotti prima di rimanere senza" e domande simili"""
+    mark = suggest_reorder_date()
+    output = cat.llm(
+        f""" Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per data e per nome prodotto che farai
+        
+        {mark}
+
+        Metti in evidenza le date previste per ogni prodotto
+        """, stream=True
+    )
+
+    return output
