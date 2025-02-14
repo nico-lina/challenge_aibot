@@ -1,6 +1,12 @@
 import pandas as pd
 import odoorpc
 import matplotlib.pyplot as plt
+from fpdf import FPDF
+from datetime import datetime
+from pathlib import Path
+import math
+
+
 
 # Connessione a Odoo
 def connect_to_odoo():
@@ -34,8 +40,10 @@ def get_stock_overview():
     }]
 
     df = pd.DataFrame(data)
+
+    df_markdown = df.to_markdown(index=False)
     
-    return df
+    return df_markdown, df
 
 
 # Dettaglio stock per prodotto
@@ -45,9 +53,11 @@ def get_stock_report():
     
     Product = odoo.env['product.product']
     StockQuant = odoo.env['stock.quant']
+    OrderPoint = odoo.env['stock.warehouse.orderpoint']
+    ProductCategory = odoo.env['product.category']
     
     products = Product.search_read([], ['id', 'name', 'categ_id', 'standard_price'])
-    quants = StockQuant.search_read([], ['product_id', 'location_id', 'quantity'])
+    quants = StockQuant.search_read([('quantity', '>=', 0)], ['product_id', 'location_id', 'quantity'])
     
     stock_data = {}
     for quant in quants:
@@ -60,54 +70,56 @@ def get_stock_report():
     for product in products:
         product_id = product['id']
         product_name = product['name']
-        category = product['categ_id'][1] if product['categ_id'] else 'Sconosciuto'
+
+        # Recupera l'ID della categoria
+        categ_id = product['categ_id'][0] if product['categ_id'] else None
+
+        # Recupera il nome della categoria dalla tabella 'product.category'
+        if categ_id:
+            category_data = ProductCategory.search_read([('id', '=', categ_id)], ['name'])
+            if category_data:
+                category = category_data[0]['name']
+
         price = product['standard_price']
         quantity = stock_data.get(product_id, 0)
         total_value = quantity * price
 
+        # Recupera la quantità minima per il prodotto
+        min_quantity_data = OrderPoint.search_read([('product_id', '=', product_id)], ['product_min_qty'])
+        min_quantity = min_quantity_data[0]['product_min_qty'] if min_quantity_data else 0
+        
+        # Recupera la quantità disponibile dal dizionario stock_data
+        quantity = stock_data.get(product_id, 0)
+
+        threshold = min_quantity * 1.2 # il 20%
+        threshold_rounded = math.ceil(threshold)
+
+        # Determina il livello di criticità
+        if quantity < min_quantity or quantity == 0:
+            criticality_level = 'high'
+        elif quantity <= threshold:  # Maggiore del minimo, ma sotto il 20% sopra
+            criticality_level = 'medium'
+        else:
+            criticality_level = 'low'
+
+        status = '🟢 OK' if criticality_level == "low" else ('🟠 Attenzione' if criticality_level == "medium" else '🔴 Critico')
+
         data.append({
-            'Prodotto': product_name,
+            'Nome Prodotto': product_name,
             'Categoria': category,
             'Quantità Disponibile': quantity,
+            'Soglia Minima': min_quantity,
+            'Threshold': threshold_rounded,
+            'Stato': status,
             'Prezzo Unitario (€)': price,
-            'Valore Totale (€)': total_value
+            'Valore Totale (€)': total_value,
         })
 
     df = pd.DataFrame(data)
 
-    return df
+    df_markdown = df.to_markdown(index=False)
 
-
-# Analisi livelli di stock
-def get_low_stock_alerts():
-    
-    odoo = connect_to_odoo()
-    
-    Product = odoo.env['product.product']
-    StockQuant = odoo.env['stock.quant']
-    
-    products = Product.search_read([], ['id', 'name', 'low_stock_threshold'])
-    quants = StockQuant.search_read([], ['product_id', 'quantity'])
-    
-    stock_data = {q['product_id'][0]: q['quantity'] for q in quants if q['product_id']}
-    
-    data = []
-    for product in products:
-        product_id = product['id']
-        # threshold = product.get('low_stock_threshold', 10)  # Default a 10 se non esiste
-        quantity = stock_data.get(product_id, 0)
-        status = '🟢 OK' if quantity >= threshold else ('🟠 Attenzione' if quantity > 0 else '🔴 Critico')
-
-        data.append({
-            'Prodotto': product['name'],
-            'Quantità Disponibile': quantity,
-            # 'Soglia Minima': threshold,
-            'Stato Stock': status
-        })
-
-    df = pd.DataFrame(data)
-    
-    return df
+    return df_markdown, df
 
 
 # Movimenti di magazzino (entrate/uscite)
@@ -116,39 +128,58 @@ def get_stock_movements():
     odoo = connect_to_odoo()
     
     StockMove = odoo.env['stock.move']
-    
-    moves = StockMove.search_read([], ['product_id', 'date', 'location_id', 'location_dest_id', 'product_uom_qty'])
+    Product = odoo.env['product.template']
+    Stakeholder = odoo.env['res.partner']
+    Location = odoo.env['stock.location']
+
+    moves = StockMove.search_read([], ['product_id', 'date', 'location_id', 'location_dest_id', 'product_uom_qty', 'partner_id'])
     
     data = []
     for move in moves:
-        product = move['product_id'][1] if move['product_id'] else 'Sconosciuto'
-        movement_type = 'Entrata' if move['location_id'] and move['location_dest_id'] else 'Uscita'
+        print("Move:", move)
+        product_id = move['product_id'][0] if move['product_id'] else 'Sconosciuto'
+        print("Product ID:", product_id)
+        products = Product.search_read([("id", "=", product_id)], ['name'])
+        print("Products", products)
+        product_name = products[0]['name']
+
+        locations = Location.search_read([("id", "=", move['location_dest_id'])], ['id', 'usage'])
+        location = locations[0]
+        movement_type = 'Entrata' if location['usage'] == 'internal' else 'Uscita'
+
+        if movement_type == 'Entrata':
+            stk_id = move['partner_id'][1] if move['partner_id'] else 'Sconosciuto'
+
+            stakeholders = Stakeholder.search_read([("id", "=", stk_id)], ['name'])
+            stakeholder_name = stakeholders[0]['name']
+        else:
+            stakeholder_name = 'Non Disponibile'
+        
         
         data.append({
+            'Prodotto ID': product_id,
+            'Nome del Prodotto': product_name,
             'Data': move['date'],
-            'Prodotto': product,
             'Tipo Movimento': movement_type,
-            'Quantità': move['product_uom_qty']
+            'Quantità': move['product_uom_qty'],
+            'Fornitore': stakeholder_name
         })
 
     df = pd.DataFrame(data)
 
-    return df
+    df_markdown = df.to_markdown(index=False)
+
+    return df_markdown, df
 
 
 # Funzione per generare il report
 def generate_warehouse_report():
 
-    overview = get_stock_overview()
-    stock = get_stock_report()
-    low_stock_alert = get_low_stock_alerts()
-    stock_movement = get_stock_movements()
+    overview, _ = get_stock_overview()
+    stock, _ = get_stock_report()
+    stock_movement, _ = get_stock_movements()
 
-    return overview, stock, low_stock_alert, stock_movement
-
-
-
-
+    return overview, stock, stock_movement
 
 
 
@@ -172,3 +203,45 @@ def plot_stock_trend():
     plt.xticks(rotation=45)
     plt.grid()
     plt.show()
+
+
+
+def write_pdf(data, file_name):
+
+    # Crea un'istanza di FPDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Carica un font che supporta Unicode
+    pdf.add_font('DejaVu', '', 'fonts/DejaVuSans.ttf', uni=True)
+    pdf.set_font('DejaVu', '', 10)
+    # pdf.set_font("Arial", size=10)
+
+    # Impostare il margine orizzontale per il testo
+    pdf.set_left_margin(5)
+    pdf.set_right_margin(5)
+    
+    # Scrivi l'output nel PDF, suddividendolo per linee
+    lines = data.split('\n')
+    for line in lines:
+        pdf.multi_cell(200, 10, line)
+    
+    # Ottieni la data e ora corrente
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    pdf_file_name = f"{file_name}_{current_time}"
+
+    # Trova il percorso della directory corrente (utils)
+    current_dir = Path(__file__).resolve().parent
+
+    # Vai su di due livelli e accedi a static
+    static_dir = current_dir.parent.parent / 'static'
+
+    # Percorso completo per il file PDF
+    pdf_file_path = static_dir / pdf_file_name
+
+    # Salva il PDF in static
+    pdf.output(str(pdf_file_path))
+
+    print(f"PDF salvato come {pdf_file_name}.pdf")
