@@ -46,10 +46,11 @@ def get_product_by_name(product_name):
     print("MATCHES: ", matches)
     # Controlla se esiste un match con score >= 90
     best_match = next((match[0] for match in matches if match[1] >= 80), None)
-
+    
     if best_match:
         # Troviamo il prodotto esatto
         matched_product = next(prod for prod in products if prod['name'] == best_match)
+        print("MATCHED PRODUCT: ", matched_product)
         return {
             "id": matched_product["id"],
             "name": matched_product["name"]
@@ -90,9 +91,7 @@ def predict_future_demand(id, months: int):
     # Convertire il periodo in un valore numerico per la regressione
     df["months_since_start"] = (df["year_month"].astype(str).astype("datetime64") - df["year_month"].min().to_timestamp()).dt.days // 30
     df["months_since_start"] = df["months_since_start"].astype(int)  # Ensure it's an integer type
-    
-    print('Month type:', df["months_since_start"].dtype)
-    
+        
     predictions = {}
     
     months = int(months)
@@ -116,7 +115,7 @@ def predict_future_demand(id, months: int):
     return predictions
 
 
-def suggest_reorder_date(months_ahead=3):
+def suggest_reorder_date(name, months_ahead=3):
     """
     Suggerisce la migliore data per il riordino basandosi sulla domanda prevista,
     in modo da non scendere sotto la quantità minima.
@@ -124,10 +123,12 @@ def suggest_reorder_date(months_ahead=3):
     odoo = get_odoo_connection()
     StockWarehouse = odoo.env['stock.warehouse.orderpoint']
     PurchaseLine = odoo.env['purchase.order.line']
-    
+
+    id = get_product_by_name(name)
+
     # Recupero dati di stock e ordini
-    stock_data = StockWarehouse.search_read([], ['product_id', 'product_min_qty', 'product_max_qty'])
-    order_data = PurchaseLine.search_read([], ['product_id', 'name', 'product_qty', 'create_date', 'date_planned'])
+    stock_data = StockWarehouse.search_read([('product_id', '=', id['id'])], ['product_id', 'product_min_qty', 'product_max_qty'])
+    order_data = PurchaseLine.search_read([('product_id', '=', id['id'])], ['product_id', 'name', 'product_qty', 'create_date', 'date_planned'])
 
     stock_df = pd.DataFrame(stock_data)
     order_df = pd.DataFrame(order_data)
@@ -150,7 +151,7 @@ def suggest_reorder_date(months_ahead=3):
     reorder_dates = {}
     
     # Ottieni previsioni della domanda futura per i prossimi mesi
-    future_demand = predict_future_demand(months_ahead)
+    future_demand = predict_future_demand(name, months_ahead)
     
     for _, row in stock_df.iterrows():
         product_id = row['product_id']

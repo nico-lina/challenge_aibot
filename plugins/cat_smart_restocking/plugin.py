@@ -21,7 +21,6 @@ def predict_quantity(tool_input, cat):
         stream=True
     )
 
-    print("MESI", mesi_input)
     prodotto_input = cat.llm(
         f""" Da {tool_input} estrai il nome del prodotto per cui fare la previsione.
         L'OUTPUT DEVE ESSERE UNA STRINGA.
@@ -53,7 +52,17 @@ def predict_quantity(tool_input, cat):
 )
 def predict_date(tool_input, cat):
     """Rispondi a "Quando dovrò riordinare i prodotti prima di rimanere senza" e domande simili"""
-    mark = suggest_reorder_date()
+
+    prodotto_input = cat.llm(
+        f""" Da {tool_input} estrai il nome del prodotto per cui fare la previsione.
+        L'OUTPUT DEVE ESSERE UNA STRINGA.
+        """,
+        stream=True
+    )
+
+    print('PRODOTTO', prodotto_input)
+
+    mark = suggest_reorder_date(prodotto_input)
     output = cat.llm(
         f""" Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per data e per nome prodotto che farai
         
