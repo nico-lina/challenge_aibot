@@ -12,23 +12,18 @@ from .utils import predict_future_demand, suggest_reorder_date
     ]
 )
 def predict_quantity(tool_input, cat):
-    """Rispondi a "Quante unità venderò di un prodotto" e domande simili"""
+    """
+    Rispondi a "Quante unità venderò di un prodotto" e domande simili
+    Questo tool prende in input il nome del prodotto e il numero di mesi per cui fare la previsione.
+    Gli input devono essere forniti nel seguente formato:
+    - Il primo valore è una stringa contenente il nome del prodotto.
+    - Il secondo valore è un numero intero che rappresenta il numero di mesi.
+    Dall'input devi estrarre solo il nome del prodotto e il numero di mesi, senza caratteri speciali.
+    """
 
-    mesi_input = cat.llm(
-        f""" Da {tool_input} estrai il numero di mesi per cui fare la previsione.
-        L'OUTPUT DEVE ESSERE UN NUMERO INTERO.
-        """,
-        stream=True
-    )
+    prodotto_input, mesi_input = tool_input.split(", ")
 
-    prodotto_input = cat.llm(
-        f""" Da {tool_input} estrai il nome del prodotto per cui fare la previsione.
-        L'OUTPUT DEVE ESSERE UNA STRINGA.
-        """,
-        stream=True
-    )
-
-    mark = predict_future_demand(prodotto_input, mesi_input)
+    mark = predict_future_demand(prodotto_input, int(mesi_input))
 
     output = cat.llm(
         f""" Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per prodotto che farai
