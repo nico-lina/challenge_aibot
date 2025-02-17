@@ -2,6 +2,7 @@ import pandas as pd
 from cat.experimental.form import CatForm, CatFormState, form
 from cat.mad_hatter.decorators import hook, tool
 from pydantic import BaseModel, constr
+from cat.plugins.super_cat_form.super_cat_form import SuperCatForm, super_cat_form
 
 from .utili import (
     create_customer,
@@ -127,9 +128,18 @@ class Supplier(BaseModel):
     supplier_email: str
 
 
-@form
-class SupplierForm(CatForm):
-    description = "Inserimento di un fornitore"
+@super_cat_form
+class SupplierForm(SuperCatForm):
+    description = """Crea un nuovo fornitore nel sistema con i seguenti dettagli:
+
+Nome: {supplier_name}
+Indirizzo: {supplier_street}, {supplier_city}, {supplier_zip}
+Telefono: {supplier_phone}
+Email: {supplier_email}
+Assicurati che tutti i campi siano validi prima di procedere con la creazione.
+Ogni volta che viene chiesta la creazione di un nuovo fornitore dimentica tutto quello che ricordi dei
+vecchi fornitori inseriti.
+"""
     model_class = Supplier
     start_examples = [
         "Voglio inserire un nuovo fornitore",
@@ -199,9 +209,18 @@ class Customer(BaseModel):
     customer_type: str
 
 
-@form
-class CustomerForm(CatForm):
-    description = "Inserimento di un cliente"
+@super_cat_form
+class CustomerForm(SuperCatForm):
+    description = """Crea un nuovo cliente nel sistema con i seguenti dettagli:
+
+Nome: {customer_name}
+Indirizzo: {customer_street}, {customer_city}, {customer_zip}
+Telefono: {customer_phone}
+Email: {customer_email}
+Assicurati che tutti i campi siano validi prima di procedere con la creazione.
+Ogni volta che viene chiesta la creazione di un nuovo cliente dimentica tutto quello che ricordi dei
+vecchi clienti inseriti.
+"""
     model_class = Customer
     start_examples = [
         "Voglio inserire un nuovo cliente",
