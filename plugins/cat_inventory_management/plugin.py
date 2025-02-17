@@ -119,12 +119,12 @@ def send_mail_to_wh_manager(tool_input, cat):
 
 
 class Supplier(BaseModel):
-    name: constr(min_length=1)
-    street: str
-    city: str
-    zip: constr(min_length=4, max_length=10)
-    phone: constr(min_length=5, max_length=20)
-    email: str
+    supplier_name: constr(min_length=1)
+    supplier_street: str
+    supplier_city: str
+    supplier_zip: constr(min_length=4, max_length=10)
+    supplier_phone: constr(min_length=5, max_length=20)
+    supplier_email: str
 
 
 @form
@@ -152,18 +152,19 @@ class SupplierForm(CatForm):
 
     def submit(self, form_data):
         result, link = create_supplier(
-            supplier_name=form_data["name"],
-            supplier_street=form_data["street"],
-            supplier_city=form_data["city"],
-            supplier_zip=form_data["zip"],
-            supplier_phone=form_data["phone"],
-            supplier_email=form_data["email"],
+            supplier_name=form_data["supplier_name"],
+            supplier_street=form_data["supplier_street"],
+            supplier_city=form_data["supplier_city"],
+            supplier_zip=form_data["supplier_zip"],
+            supplier_phone=form_data["supplier_phone"],
+            supplier_email=form_data["supplier_email"],
         )
 
-        supplier_name = form_data["name"]
+        supplier_name = form_data["supplier_name"]
+
         if result:
             return {
-                "output": f'Ho creato il fornitore <a href="{link}" target="_blank"> {supplier_name}</a>'
+                "output": f'Ho creato il fornitore <a href="{link}" target="_blank"> {supplier_name}</a> -{self._state}'
             }
         else:
             return {"output": "Non ho potuto creare il fornitore"}
@@ -189,12 +190,12 @@ class SupplierForm(CatForm):
 
 
 class Customer(BaseModel):
-    name: constr(min_length=1)
-    street: str
-    city: str
-    zip: constr(min_length=4, max_length=10)
-    phone: constr(min_length=5, max_length=20)
-    email: str
+    customer_name: constr(min_length=1)
+    customer_street: str
+    customer_city: str
+    customer_zip: constr(min_length=4, max_length=10)
+    customer_phone: constr(min_length=5, max_length=20)
+    customer_email: str
     customer_type: str
 
 
@@ -229,16 +230,16 @@ Se si tratta di una persona fisica restituisci person altrimenti company.
 Rispondi solo person o company
 """)
         result, link = create_customer(
-            customer_name=form_data["name"],
-            customer_street=form_data["street"],
-            customer_city=form_data["city"],
-            customer_zip=form_data["zip"],
-            customer_phone=form_data["phone"],
-            customer_email=form_data["email"],
+            customer_name=form_data["customer_name"],
+            customer_street=form_data["customer_street"],
+            customer_city=form_data["customer_city"],
+            customer_zip=form_data["customer_zip"],
+            customer_phone=form_data["customer_phone"],
+            customer_email=form_data["customer_email"],
             customer_type=customer_type,
         )
 
-        customer_name = form_data["name"]
+        customer_name = form_data["customer_name"]
         if result:
             return {
                 "output": f'Ho creato il cliente <a href="{link}" target="_blank"> {customer_name}</a>'
@@ -250,7 +251,7 @@ Rispondi solo person o company
         prompt = (
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
-            "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il fornitore nel sistema? Rispondi dicendo Si puoi inserirlo'"
+            "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il cliente nel sistema? Rispondi dicendo Si puoi inserirlo'"
         )
 
         print(self._state)

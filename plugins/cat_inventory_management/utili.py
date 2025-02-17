@@ -258,3 +258,6 @@ def create_customer(
         f"http://localhost:8069/web#id={customer_id}&model=res.partner&view_type=form"
     )
     return [True, odoo_url]
+
+
+# key-2tMtprQhzSbmrzAFHk9MzfCrSU6Euw2DPMXoQIFckGxCZqYpvMU8sIwJhOHbAi0EmOODoHjoGS7r5ApRRhMKaRJYdXzdBM86
