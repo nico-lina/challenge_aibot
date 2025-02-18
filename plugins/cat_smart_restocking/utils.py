@@ -43,14 +43,13 @@ def get_product_by_name(product_name):
 
     # Ricerca fuzzy per trovare i prodotti simili
     matches = process.extract(product_name, product_names, scorer=fuzz.ratio, limit=10)  # Prendiamo fino a 10 migliori risultati
-    print("MATCHES: ", matches)
+    # print("MATCHES: ", matches)
     # Controlla se esiste un match con score >= 90
     best_match = next((match[0] for match in matches if match[1] >= 80), None)
     
     if best_match:
         # Troviamo il prodotto esatto
         matched_product = next(prod for prod in products if prod['name'] == best_match)
-        print("MATCHED PRODUCT: ", matched_product)
         return {
             "id": matched_product["id"],
             "name": matched_product["name"]
@@ -177,3 +176,4 @@ def suggest_reorder_date(name, months_ahead=3):
         reorder_dates[product_name] = reorder_date.strftime('%Y-%m-%d')
 
     return reorder_dates
+

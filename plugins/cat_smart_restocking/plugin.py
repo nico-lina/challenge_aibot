@@ -55,8 +55,6 @@ def predict_date(tool_input, cat):
         stream=True
     )
 
-    print('PRODOTTO', prodotto_input)
-
     mark = suggest_reorder_date(prodotto_input)
     output = cat.llm(
         f""" Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per data e per nome prodotto che farai
