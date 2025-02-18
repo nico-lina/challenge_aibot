@@ -200,16 +200,220 @@ def get_stock_movements():
     return df_markdown, df
 
 
+def get_supplier_performance_data_2():
+    try:
+        odoo = connect_to_odoo()
+
+        Purchase = odoo.env['purchase.order']
+        Supplier = odoo.env['res.partner']
+        Product = odoo.env['product.product']
+        OrderLine = odoo.env['purchase.order.line']
+
+        # Estrazione degli ordini di acquisto completati o confermati
+        purchase_orders = Purchase.search_read(
+            [("state", "in", ['purchase', 'done'])], 
+            ['partner_id', 'date_order', 'date_approve', 'order_line', 'state']
+        )
+
+        data = []
+
+        for order in purchase_orders:
+            # Dettagli fornitore
+            supplier_id = order['partner_id'][0]
+            supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
+            supplier_info = supplier_data[0] if supplier_data else {'name': 'Sconosciuto', 'email': 'N/A'}
+
+            order_lines = []
+            for line_id in order['order_line']:
+                lines = OrderLine.search_read([('id', '=', line_id)], 
+                                              ['product_id', 'product_qty', 'price_unit', 'price_total'])
+                if not lines:
+                    continue
+
+                line = lines[0]
+                product_data = Product.search_read([('id', '=', line['product_id'][0])], ['name'])
+                product_name = product_data[0]['name'] if product_data else 'Prodotto Sconosciuto'
+
+                order_lines.append({
+                    'product_name': product_name,
+                    'product_price': line['price_unit'],
+                    'quantity': line['product_qty'],
+                    'subtotal': line['price_total']
+                })
+
+            date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
+            date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
+            delivery_time = max((date_approve - date_order).days, 0)
+
+            for line in order_lines:
+                data.append({
+                    'Fornitore': supplier_info['name'],
+                    'Email Fornitore': supplier_info.get('email', 'N/A'),
+                    'Prodotto': line['product_name'],
+                    'Quantità': line['quantity'],
+                    'Prezzo': line['product_price'],
+                    'Totale Ordine': line['subtotal'],
+                    'Data Ordine': date_order,
+                    'Data Approvazione': date_approve,
+                    'Tempo di Consegna (giorni)': delivery_time,
+                    'Stato Ordine': order['state'],  # Nuova colonna per lo stato
+                })
+
+        # Creazione del DataFrame
+        df = pd.DataFrame(data)
+
+        # Calcolare performance aggregate per fornitore
+        performance = df.groupby('Fornitore').agg({
+            'Totale Ordine': 'sum',
+            'Tempo di Consegna (giorni)': 'mean',
+            'Quantità': 'sum',
+        }).reset_index()
+
+        # Calcolare performance aggregate per fornitore
+        performance = df.groupby('Fornitore').agg({
+            'Totale Ordine': 'sum',
+            'Tempo di Consegna (giorni)': 'mean',
+            'Quantità': 'sum',
+        }).reset_index()
+
+        # Aggiungere l'indicatore di performance
+        def get_performance_indicator(days):
+            if days <= 0:
+                return '🟢'  # Buono
+            elif days <= 5:
+                return '🟠'  # Migliorabile
+            else:
+                return '🔴'  # Critico
+
+        performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)
+
+        performance = performance.sort_values(by='Tempo di Consegna (giorni)')
+
+        # Generazione del markdown per la visualizzazione
+        performance_markdown = performance.to_markdown(index=False)
+
+        return performance_markdown, performance
+
+    except Exception as e:
+        print(f"Errore durante l'estrazione delle performance dei fornitori: {e}")
+        return None, None
+
+
+
+
+def get_supplier_performance_data():
+    
+    odoo = connect_to_odoo()
+
+    Purchase = odoo.env['purchase.order']
+    Supplier = odoo.env['res.partner']
+    Product = odoo.env['product.product']
+    OrderLine = odoo.env['purchase.order.line']
+
+    # Estrazione degli ordini di acquisto completati o confermati
+    purchase_orders = Purchase.search_read(
+        [("state", "in", ['purchase', 'done'])], 
+        ['partner_id', 'date_order', 'date_approve', 'order_line', 'state']
+    )
+    data = []
+
+    for order in purchase_orders:
+        
+        print("Purchase order:", order)
+
+        # Ottenere i dettagli dei fornitori
+        supplier_id = order['partner_id'][0]
+        supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
+        supplier_info = supplier_data[0]
+
+        print("Supplier:", supplier_data)
+
+        order_lines = []
+        for line_id in order['order_line']:
+            lines = OrderLine.search_read([('id', '=', line_id)], ['product_id', 'product_qty', 'price_unit', 'price_total'])
+
+            print("Lines:", lines)
+            line = lines[0]
+
+            print("Order line:", line)
+            print("Product line:", line['product_id'][0])
+            product_data = Product.search_read([('id', '=', line['product_id'][0])], ['name'])
+
+            print("Product:", product_data)
+        
+            order_lines.append({
+                'product_name': product_data[0]['name'],
+                'product_price': line['price_unit'],
+                'quantity': line['product_qty'],  # Quantità acquistata
+                'subtotal': line['price_total']
+            })
+
+        print("Order Lines: ", order_lines)
+    
+        date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
+        date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
+        
+        for line in order_lines:
+            data.append({
+                'Fornitore': supplier_info['name'],
+                'Email Fornitore': supplier_info['email'],
+                'Prodotto': line['product_name'],
+                'Quantità': line['quantity'],
+                'Prezzo': line['product_price'],
+                'Totale Ordine': line['subtotal'],
+                'Data Ordine': date_order,
+                'Data Approvazione': date_approve,
+                'Tempo di Consegna (giorni)': (date_approve - date_order).days,
+            })
+
+        print("Order Lines: ", data)
+    
+    df = pd.DataFrame(data)
+
+    # Calcolare le performance
+    df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
+
+    # Calcolare performance aggregate per fornitore
+    performance = df.groupby('Fornitore').agg({
+        'Totale Ordine': 'sum',
+        'Tempo di Consegna (giorni)': 'mean',
+        'Quantità': 'sum',
+    }).reset_index()
+
+    # Calcolare performance aggregate per fornitore
+    performance = df.groupby('Fornitore').agg({
+        'Totale Ordine': 'sum',
+        'Tempo di Consegna (giorni)': 'mean',
+        'Quantità': 'sum',
+    }).reset_index()
+
+    # Aggiungere l'indicatore di performance
+    def get_performance_indicator(days):
+        if days <= 0:
+            return '🟢'  # Buono
+        elif days <= 5:
+            return '🟠'  # Migliorabile
+        else:
+            return '🔴'  # Critico
+
+    performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)
+
+    performance = performance.sort_values(by='Tempo di Consegna (giorni)')
+
+    performance_markdown = performance.to_markdown(index=False)
+
+    return performance_markdown, performance
+
+
 # Funzione per generare il report
 def generate_warehouse_report():
 
     overview, _ = get_stock_overview()
     stock, _ = get_stock_report()
     stock_movement, _ = get_stock_movements()
+    supplier, _ = get_supplier_performance_data()
 
-    return overview, stock, stock_movement
-
-
+    return overview, stock, stock_movement, supplier
 
 
 # Analisi del valore dello stock nel tempo
@@ -275,88 +479,3 @@ def write_pdf(data, file_name):
     print(f"PDF salvato come {pdf_file_name}.pdf")
 
 
-
-
-
-
-def get_supplier_performance_data():
-    
-    odoo = connect_to_odoo()
-
-    Purchase = odoo.env['purchase.order']
-    Supplier = odoo.env['res.partner']
-    Product = odoo.env['product.product']
-
-    # Estrazione degli ordini di acquisto completati
-    purchase_orders = Purchase.search_read([("state", "=", 'purchase')], ['partner_id', 'date_order', 'date_approve', 'order_line'])
-
-    data = []
-
-    for order in purchase_orders:
-        
-        print("Purchase order:", order)
-
-        # Ottenere i dettagli dei fornitori
-        supplier_id = order['partner_id'][0]
-        supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
-        supplier_info = supplier_data[0]
-
-        print("Supplier:", supplier_data)
-
-        order_lines = []
-        for line in order_lines['order_line']:
-            product_id = line
-            print("Product ID:", product_id)
-            product_data = Product.search_read(['id', '=', product_id], ['nome', 'standard_price'])
-
-            print("Product Line:", product_data)
-        
-            order_lines.append({
-                'product_name': product_data[0]['name'],
-                'product_price': product_data[0]['standard_price'],
-                'quantity': line[2],  # Quantità acquistata
-                'subtotal': line[2] * product_data[0]['standard_price']  # Subtotale per riga
-            })
-
-        date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
-        date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
-        
-        for line in order_lines:
-            data.append({
-                'Fornitore': supplier_info['name'],
-                'Email Fornitore': supplier_info['email'],
-                'Prodotto': line['product_name'],
-                'Quantità': line['quantity'],
-                'Prezzo': line['product_price'],
-                'Totale Ordine': line['subtotal'],
-                'Data Ordine': date_order,
-                'Data Approvazione': date_approve,
-                'Tempo di Consegna (giorni)': (date_approve - date_order).days,
-            })
-    
-    df = pd.DataFrame(data)
-
-    # Calcolare le performance
-    df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
-
-    # Calcolare performance aggregate per fornitore
-    performance = df.groupby('Fornitore').agg({
-        'Totale Ordine': 'sum',
-        'Tempo di Consegna (giorni)': 'mean',
-        'Quantità': 'sum',
-    }).reset_index()
-
-    performance = performance.sort_values(by='Tempo di Consegna (giorni)')
-
-    performance_markdown = performance.to_markdown(index=False)
-
-    return performance_markdown, performance
-
-
-
-
-# Funzione per ottenere dettagli sugli articoli dell'ordine
-def get_order_lines(order):
-
-
-    return lines

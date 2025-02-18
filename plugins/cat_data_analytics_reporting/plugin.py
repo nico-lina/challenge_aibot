@@ -23,7 +23,7 @@ def generate_report(tool_input, cat):
     """ Genera un report dettagliato sullo stato del magazzino """
 
     # Ottieni i dati dal magazzino
-    warehouse_overview, stock_data, stock_movement = generate_warehouse_report()
+    warehouse_overview, stock_data, stock_movement, supplier_performance_data = generate_warehouse_report()
 
     # Prepara il prompt per il modello LLM
     prompt = f"""
@@ -66,9 +66,20 @@ def generate_report(tool_input, cat):
     - Quantità
     - Fornitore o Cliente
 
-    5. **Conclusione:**
+    5. **Analisi delle Performance dei Fornitori:**
+    Analizzare i dati relativi a ciascun fornitore, includendo le seguenti informazioni:
+    - **Tempo Medio di Consegna**: Calcolare il tempo medio tra la data dell'ordine e la data di approvazione per ogni fornitore.
+    - **Affidabilità del Fornitore**: Identificare i fornitori con il miglior tempo di consegna e la minor percentuale di ritardi.
+    - **Quantità Totale Acquistata**: Sommare la quantità totale acquistata per ogni fornitore.
+    - **Totale Ordini**: Sommare il totale degli ordini effettuati a ciascun fornitore.
+    Fai una sintesi delle principali osservazioni emerse dai dati.
+    Evidenzia i fornitori più performanti, con suggerimenti per miglioramenti.
+    Fai un'analisi comparativa dei fornitori per tempi di consegna, costi e affidabilità.
+    Fai raccomandazioni per ottimizzare il processo di approvvigionamento.
+
+    6. **Conclusione:**
     Sintesi delle principali osservazioni emerse dal report.
-    Indicazioni su eventuali azioni da intraprendere, come l'adeguamento dei livelli di stock o il riordino di prodotti con scorte basse.
+    Indicazioni su eventuali azioni da intraprendere, come l'adeguamento dei livelli di stock o il riordino di prodotti con scorte basse, come ottimizzare il processo di riappovogionamento.
     Commento finale sullo stato generale del magazzino e suggerimenti per miglioramenti.
 
     Dati disponibili:
@@ -80,6 +91,8 @@ def generate_report(tool_input, cat):
     {low_stock_alert}
     - **Movimenti di Magazzino**
     {stock_movement}
+    - **Analisi delle Performance dei Fornitori**
+    {supplier_performance_data}
     
     Organizza il report in paragrafi chiari e ben strutturati, e deve essere fornito in formato tabellare.
     
@@ -284,14 +297,8 @@ def generate_supplier_performance_report(tool_input, cat):
     Analizzare i dati relativi a ciascun fornitore, includendo le seguenti informazioni:
     - **Tempo Medio di Consegna**: Calcolare il tempo medio tra la data dell'ordine e la data di approvazione per ogni fornitore.
     - **Affidabilità del Fornitore**: Identificare i fornitori con il miglior tempo di consegna e la minor percentuale di ritardi.
-    - **Prezzo Medio per Prodotto**: Calcolare il prezzo medio per ciascun prodotto fornito da ogni fornitore.
     - **Quantità Totale Acquistata**: Sommare la quantità totale acquistata per ogni fornitore.
     - **Totale Ordini**: Sommare il totale degli ordini effettuati a ciascun fornitore.
-
-    Ordina i dati per:
-    - Tempo di Consegna medio (dal più breve al più lungo)
-    - Prezzo medio per prodotto (dal più basso al più alto)
-    - Quantità totale acquistata (dal più alto al più basso)
 
     3. **Conclusione:**
     Sintesi delle principali osservazioni emerse dal report.
@@ -304,6 +311,7 @@ def generate_supplier_performance_report(tool_input, cat):
     {supplier_performance_data}
 
     Organizza il report in paragrafi chiari e ben strutturati, con dati numerici facili da leggere e analizzare.
+    Usa il grasseto e dimensioni del testo diverse in base ai titoli dei paragrafi.
 
     Formato del Report: Il report deve essere fornito come un DataFrame o una tabella, con una chiara separazione tra le sezioni e le informazioni ben organizzate. Ogni sezione dovrà essere facilmente leggibile e comprendere sia i dati numerici che eventuali osservazioni sui fornitori.
 
