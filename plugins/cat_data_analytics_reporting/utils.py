@@ -128,44 +128,72 @@ def get_stock_movements():
     odoo = connect_to_odoo()
     
     StockMove = odoo.env['stock.move']
-    Product = odoo.env['product.template']
+    Product = odoo.env['product.product']
     Stakeholder = odoo.env['res.partner']
     Location = odoo.env['stock.location']
 
     moves = StockMove.search_read([], ['product_id', 'date', 'location_id', 'location_dest_id', 'product_uom_qty', 'partner_id'])
     
     data = []
+
     for move in moves:
         print("Move:", move)
         product_id = move['product_id'][0] if move['product_id'] else 'Sconosciuto'
         print("Product ID:", product_id)
-        products = Product.search_read([("id", "=", product_id)], ['name'])
+        products = Product.search_read([("id", "=", product_id)], ['name', 'categ_id'])
         print("Products", products)
         product_name = products[0]['name']
+        product_category = products[0]['categ_id'][1] if products[0]['categ_id'] else 'Sconosciuta'
 
-        locations = Location.search_read([("id", "=", move['location_dest_id'])], ['id', 'usage'])
+        print(move['location_dest_id'][0])
+        locations = Location.search_read([("id", "=", move['location_dest_id'][0])], ['id', 'usage'])
         location = locations[0]
-        movement_type = 'Entrata' if location['usage'] == 'internal' else 'Uscita'
+        print("Location Dest:", location)
+        movement_type = '🟢 Entrata' if location['usage'] == 'internal' else '🔴 Uscita'
 
-        if movement_type == 'Entrata':
-            stk_id = move['partner_id'][1] if move['partner_id'] else 'Sconosciuto'
+        print("mov type:", movement_type)
 
-            stakeholders = Stakeholder.search_read([("id", "=", stk_id)], ['name'])
+        # Convertire la stringa in un oggetto datetime
+        move_date = datetime.strptime(move['date'], "%Y-%m-%d %H:%M:%S")
+
+        # Estrarre solo il giorno
+        move_date = move_date.date()
+
+        print("Data:", move['date'])
+        print("Data:", type(move['date']))
+        print("Data:", move_date)
+
+        if move['partner_id']:
+            # Usa l'ID del partner invece del nome
+            stk_id = move['partner_id'][0]
+
+            print("Stk id:", stk_id)
+
+            # Ottenere più informazioni sul partner
+            stakeholders = Stakeholder.search_read([("id", "=", stk_id)], ['name', 'street', 'email'])
             stakeholder_name = stakeholders[0]['name']
+            stakeholder_address = stakeholders[0].get('street', 'Non disponibile')
+            stakeholder_email = stakeholders[0].get('email', 'Non disponibile')
+            print(stakeholders)
         else:
-            stakeholder_name = 'Non Disponibile'
-        
-        
+            stakeholder_name = "Non disponibile"
+            stakeholder_address = "Non disponibile"
+            stakeholder_email = "Non disponibile" 
+
         data.append({
             'Prodotto ID': product_id,
             'Nome del Prodotto': product_name,
-            'Data': move['date'],
+            'Categoria Prodotto': product_category,
+            'Data': move_date,
             'Tipo Movimento': movement_type,
             'Quantità': move['product_uom_qty'],
-            'Fornitore': stakeholder_name
+            'Fornitore': stakeholder_name,
+            'Indirizzo Fornitore': stakeholder_address,
+            'Email Fornitore': stakeholder_email,
         })
 
     df = pd.DataFrame(data)
+    df = df.sort_values(by='Data')
 
     df_markdown = df.to_markdown(index=False)
 
@@ -245,3 +273,90 @@ def write_pdf(data, file_name):
     pdf.output(str(pdf_file_path))
 
     print(f"PDF salvato come {pdf_file_name}.pdf")
+
+
+
+
+
+
+def get_supplier_performance_data():
+    
+    odoo = connect_to_odoo()
+
+    Purchase = odoo.env['purchase.order']
+    Supplier = odoo.env['res.partner']
+    Product = odoo.env['product.product']
+
+    # Estrazione degli ordini di acquisto completati
+    purchase_orders = Purchase.search_read([("state", "=", 'purchase')], ['partner_id', 'date_order', 'date_approve', 'order_line'])
+
+    data = []
+
+    for order in purchase_orders:
+        
+        print("Purchase order:", order)
+
+        # Ottenere i dettagli dei fornitori
+        supplier_id = order['partner_id'][0]
+        supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
+        supplier_info = supplier_data[0]
+
+        print("Supplier:", supplier_data)
+
+        order_lines = []
+        for line in order_lines['order_line']:
+            product_id = line
+            print("Product ID:", product_id)
+            product_data = Product.search_read(['id', '=', product_id], ['nome', 'standard_price'])
+
+            print("Product Line:", product_data)
+        
+            order_lines.append({
+                'product_name': product_data[0]['name'],
+                'product_price': product_data[0]['standard_price'],
+                'quantity': line[2],  # Quantità acquistata
+                'subtotal': line[2] * product_data[0]['standard_price']  # Subtotale per riga
+            })
+
+        date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
+        date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
+        
+        for line in order_lines:
+            data.append({
+                'Fornitore': supplier_info['name'],
+                'Email Fornitore': supplier_info['email'],
+                'Prodotto': line['product_name'],
+                'Quantità': line['quantity'],
+                'Prezzo': line['product_price'],
+                'Totale Ordine': line['subtotal'],
+                'Data Ordine': date_order,
+                'Data Approvazione': date_approve,
+                'Tempo di Consegna (giorni)': (date_approve - date_order).days,
+            })
+    
+    df = pd.DataFrame(data)
+
+    # Calcolare le performance
+    df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
+
+    # Calcolare performance aggregate per fornitore
+    performance = df.groupby('Fornitore').agg({
+        'Totale Ordine': 'sum',
+        'Tempo di Consegna (giorni)': 'mean',
+        'Quantità': 'sum',
+    }).reset_index()
+
+    performance = performance.sort_values(by='Tempo di Consegna (giorni)')
+
+    performance_markdown = performance.to_markdown(index=False)
+
+    return performance_markdown, performance
+
+
+
+
+# Funzione per ottenere dettagli sugli articoli dell'ordine
+def get_order_lines(order):
+
+
+    return lines
