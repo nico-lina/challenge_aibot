@@ -5,25 +5,17 @@ from pydantic import BaseModel, constr, validator, Field, root_validator
 import re
 import word2number as w2n
 from cat.plugins.super_cat_form.super_cat_form import SuperCatForm, form_tool, super_cat_form
-from cat.plugins.super_cat_form.super_cat_form_events import FormEvent, FormEventContext
 
 
 
 @tool(
     return_direct=True,
     examples=[
-        "Qual è lo stato dei miei ordini",
-        "Come è la situazione dei miei ordini",
-        "Dammi qualche informazione sui miei ordini",
-        "Mostrami gli ordini confermati",
-        "Mostrami solo gli ordini cancellati",
-        "Quali ordini sono stati completati",
-        "Quali ordini sono ancora in attesa di approvazione",
+        "Qual è lo stato degli ordini?",
+        "Mostrami gli ordini confermati?",
         "Quali ordini sono in bozza",
-        "Fammi vedere solo gli ordini in bozza",
         "Mostrami solo gli ordini confermati",
         "Mostrami solo gli ordini completati",
-        "Mostrami solo gli ordini in attesa di approvazione",
         
     ]
 )

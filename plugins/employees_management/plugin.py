@@ -1,8 +1,10 @@
 from cat.mad_hatter.decorators import tool
 from .utils import *
-from cat.plugins.super_cat_form.super_cat_form import SuperCatForm, form_tool, super_cat_form
-from pydantic import BaseModel, constr, validator, Field, root_validator, field_validator
+from cat.plugins.super_cat_form.super_cat_form import SuperCatForm,  super_cat_form
+from pydantic import BaseModel, constr, field_validator
 import re
+
+
 
 
 @tool(
@@ -15,16 +17,17 @@ import re
 )
 
 def get_employees_tool(tool_input, cat):
-    """Recupera tutti i dipendenti da Odoo e restituisce una tabella formattata."""
-    
-    mark = get_employees()
-
-    output = cat.llm(
-        f"""Scrivi in modo chiaro per l'utente, applicando una formattazione adeguata i dati contenuti in questa tabella.
-        {mark}
-        """, stream=True) 
-    
-    return output.replace("**", "")
+    """Recupera tutti i dipendenti da Odoo e restituisce una tabella formattata.
+    L'input è sempre None"""
+    try:
+        mark = get_employees()
+        output = cat.llm(
+            f"""Scrivi in modo chiaro per l'utente, applicando una formattazione adeguata ai dati contenuti in questa tabella.
+            {mark}
+            """, stream=True) 
+        return output.replace("**", "")
+    except Exception as e:
+        return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
 
 def clean_string(s):
     """Rimuove caratteri speciali e converte in minuscolo, mantenendo solo lettere."""
@@ -62,12 +65,8 @@ class EmployeeForm(SuperCatForm):
     ask_confirm = True
 
     def submit(self, form_data):
-        name = form_data["name"]
-        job_title = form_data["job_title"]
-        work_phone = form_data["work_phone"]
-        job_id = form_data["job_id"]
-        resource_calendar = form_data["resource_calendar"]
         
+        name = form_data["name"]
         name_parts = name.split()
     
         if len(name_parts) < 2:
@@ -82,9 +81,8 @@ class EmployeeForm(SuperCatForm):
 
         work_email = f"{first_name}_{last_name}@azienda.com"
 
-        result = create_employee(name, job_title, work_phone, work_email, job_id, resource_calendar)
+        result = create_employee(form_data, work_email)
         
-        print("RESULT", result)
 
         prompt = f"""Scrivi che il dipendente è stato creato con successo. scrivi i seguenti dettagli in maniera chiara per l'utente:
         {result}
@@ -99,7 +97,6 @@ class EmployeeForm(SuperCatForm):
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Rispondi dicendo Si puoi inserirlo'"
         )
 
-        print(self._state)
         return {"output": f"{self.cat.llm(prompt)}"}
     
     def message_incomplete(self):
@@ -116,20 +113,118 @@ class EmployeeForm(SuperCatForm):
             """
         )
         return {"output": f"{self.cat.llm(prompt)}"}
-    
 
+    def message_closed(self): 
+        prompt = (
+            f""" L'utente non vuole più inserire un nuovo dipendente, rispondi che va bene e chiedi se ha bisogno di altro
+            """
+        )
+        return {"output": f"{self.cat.llm(prompt)}"}
+    
+    
 @tool(
     return_direct = True,
-    examples = ["Trovami i nomi dei lavori"],
+    examples = ["Trovami i nomi dei lavori",
+                "Quali sono i nomi associati agli id dei lavori?"],
 )
 
 def get_job_names_tool(tool_input, cat):
-    """Recupera i nomi dei lavori disponibili in Odoo."""
-    job_names = get_job_names()
+    """Recupera i nomi dei lavori disponibili in Odoo.
+    L'input è sempre None"""
+    try:
+        job_names = get_job_names()
+        output = cat.llm(
+            f"""Ecco i nomi dei lavori disponibili:
+            {job_names}
+            """, stream=True) 
+        return output.replace("**", "")
+    except Exception as e:
+        return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
 
-    output = cat.llm(
-        f"""Ecco i nomi dei lavori disponibili:
-        {job_names}
-        """, stream=True) 
-    
-    return output.replace("**", "")
+@tool(
+    return_direct = True,
+    examples = ["Completa automaticamente il dipendente X a partire dal suo curriculum",
+                "Voglio completare la scheda di X partendo dal suo curriculum",
+                "Aggiungi le informazioni personali di X"]
+)
+
+def complete_employee_tool(tool_input, cat):
+    """Completa la scheda di un dipendente in maniera automatica prendendo le informazioni richieste dal Curriculum
+    L'input è sempre il nome del dipendente"""
+    try:
+        declarative_memory = cat.working_memory.declarative_memories
+        curriculum = ""
+        for documento in declarative_memory:
+            doc = documento[0]
+            match = is_cv_matching(doc.metadata["source"], tool_input)
+            if match:
+                curriculum += doc.page_content
+
+        prompt = f""""{curriculum}
+            Dal curriculum passato cerca, se ci sono, queste informazioni e scrivile in formato JSON
+            paese di residenza (private country)
+            numero di telefono (mobile phone)
+            email (private email)
+            campo di studi (study field)
+            scuola frequentata, in questo caso quella più recente (study school)
+            compleanno (birthday)
+            Se non è specificato metti come default null
+            In output metti solo i campi, senza mettere altro all'interno dell'output SENZA LA SCRITTA json INIZIALE"""
+        
+        out = cat.llm(prompt, stream = True)
+        result = complete_secondary_info(tool_input, out)
+        out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 
+                      Scrivi i seguenti dettagli in maniera chiara per l'utente:
+                    {result}
+                    Scrivi inoltre che se l'utente vuole aggiungere altre informazioni non specificate nel curriculum di visitare il link scritto nel risultato.
+                    """)
+        return out.replace("**", "")
+    except Exception as e:
+        return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
+
+@tool(
+    return_direct = True,
+    examples = ["Inserisci le informazioni relative agli studi e alla carriera del dipendente X",
+                "Aggiorna le informazioni relative agli studi e alla carriera di X",
+                "Aggiorna il curriculum di X"]
+)
+
+def complete_curriculum_tool(tool_input, cat):
+    """Completa la parte relativa alle esperienze lavorative e di studi del dipendente prendendole dal curriculum
+    L'input è sempre il nome del dipendente"""
+    try:
+        declarative_memory = cat.working_memory.declarative_memories
+        curriculum = ""
+        for documento in declarative_memory:
+            doc = documento[0]
+            print("DOC.CONTENT", doc.page_content)
+            match = is_cv_matching(doc.metadata["source"], tool_input)
+            if match:
+                curriculum += doc.page_content
+
+        prompt = f""""{curriculum}
+            Dal curriculum passato cerca, se ci sono, queste informazioni e scrivile in formato JSON
+            Trovi diverse informazioni crea diversi JSON
+            nome, è il nome della scuola, del posto di lavoro, o del progetto (name)
+            descrizione, è la descrizione BREVE (massimo 10 parole) del ruolo a lavoro, del progetto, o del percorso di studi (description)
+            data di inizio, è la data di fine del lavoro, del progetto o di quando ha iniziato a frequentare il percorso di studi (date_start)
+            data di fine, è la data di inizio del lavoro, del progetto o di quando ha finito di frequentare il percorso di studi (date_end)
+            Se non è specificato metti come default null
+            Se nelle date è specificato solo l'anno scrivi YYYY-01-01 per le date di inizio e YYYY-12-31 per le date di fine
+            In output metti solo i campi, senza mettere altro all'interno dell'output SENZA LA SCRITTA json INIZIALE
+            Infine aggiungi anche un campo che si chiama line_type_id che è:
+            2 -> Se si sta parlando di percorso di Istruzione (scuola, università, corsi ecc...)
+            1 -> Se si sta parlando di Esperienze di Lavoro o di volontariato
+            4 -> Se si sta parlando di progetti che non rientrano nel mondo del lavoro"""
+        
+        result = cat.llm(prompt, stream = True)
+        info = complete_curriculum_info(tool_input, result)
+
+        out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 
+                      Scrivi i seguenti dettagli in maniera chiara per l'utente:
+                    {info}
+                    Scrivi inoltre che se l'utente vuole aggiungere altre informazioni non specificate nel curriculum di visitare il link scritto nel risultato.
+                    """)
+        return out.replace("**", "")
+    except Exception as e:
+        return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
