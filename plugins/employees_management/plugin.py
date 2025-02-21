@@ -5,8 +5,6 @@ from pydantic import BaseModel, constr, field_validator
 import re
 
 
-
-
 @tool(
     return_direct = True,
     examples = ["Dammi i dettagli di tutti i dipendenti",
@@ -61,7 +59,10 @@ class EmployeeForm(SuperCatForm):
     description = "Crea un nuovo dipendente in Odoo."
     model_class = Employee
     start_examples = ["Crea un nuovo dipendente","Aggiungi un dipendente","Inserisci un nuovo dipendente"]
-    stop_examples = ["Non voglio più aggiungere un dipendente","Interrompi la creazione di un dipendente","Esci dalla creazione di un dipendente"]
+    stop_examples = ["Non voglio più aggiungere un dipendente",
+                     "Interrompi la creazione di un dipendente",
+                     "Esci dalla creazione di un dipendente", 
+                     "Non voglio più creare il dipendente"]
     ask_confirm = True
 
     def submit(self, form_data):
@@ -217,7 +218,7 @@ def complete_curriculum_tool(tool_input, cat):
             1 -> Se si sta parlando di Esperienze di Lavoro o di volontariato
             4 -> Se si sta parlando di progetti che non rientrano nel mondo del lavoro"""
         
-        result = cat.llm(prompt, stream = True)
+        result = cat.llm(prompt)
         info = complete_curriculum_info(tool_input, result)
 
         out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 

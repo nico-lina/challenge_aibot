@@ -42,7 +42,6 @@ def get_partner_id_by_name(partner_name):
 
     Partner = odoo.env['res.partner']
     partners = Partner.search_read([('name', '=', partner_name)], ['id'])
-    print("PARTNER:", partners)
     return partners[0]['id'] if partners else None
 
 

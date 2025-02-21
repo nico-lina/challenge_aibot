@@ -177,8 +177,7 @@ def get_employee_by_name(employee_name):
 
 
 def is_cv_matching(cv_filename: str, full_name: str, threshold=80) -> bool:
-    # 1. Pulizia delle stringhe
-    cv_filename = re.sub(r"[^a-zA-Z]", " ", cv_filename.lower()).strip()  # Rimuove caratteri speciali
+    cv_filename = re.sub(r"[^a-zA-Z]", " ", cv_filename.lower()).strip()  
     full_name = re.sub(r"[^a-zA-Z]", " ", full_name.lower()).strip()
     
     # 2. Tokenizzazione (separa nome e cognome)
