@@ -5,6 +5,13 @@ from fpdf import FPDF
 from datetime import datetime
 from pathlib import Path
 import math
+from markdown import markdown
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+import os
+import time
 
 
 
@@ -302,77 +309,90 @@ def get_supplier_performance_data_2():
 
 
 def get_supplier_performance_data():
-    
     odoo = connect_to_odoo()
 
     Purchase = odoo.env['purchase.order']
     Supplier = odoo.env['res.partner']
     Product = odoo.env['product.product']
     OrderLine = odoo.env['purchase.order.line']
+    StockPicking = odoo.env['stock.picking']
 
     # Estrazione degli ordini di acquisto completati o confermati
     purchase_orders = Purchase.search_read(
-        [("state", "in", ['purchase', 'done'])], 
-        ['partner_id', 'date_order', 'date_approve', 'order_line', 'state']
+        [("state", "in", ['purchase', 'done', 'sent'])], 
+        ['name', 'partner_id', 'date_order', 'date_approve', 'order_line', 'state']
     )
     data = []
 
     for order in purchase_orders:
-        
         print("Purchase order:", order)
 
-        # Ottenere i dettagli dei fornitori
+        # Ottenere i dettagli del fornitore
         supplier_id = order['partner_id'][0]
         supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
         supplier_info = supplier_data[0]
 
         print("Supplier:", supplier_data)
 
-        order_lines = []
         for line_id in order['order_line']:
             lines = OrderLine.search_read([('id', '=', line_id)], ['product_id', 'product_qty', 'price_unit', 'price_total'])
-
-            print("Lines:", lines)
             line = lines[0]
 
-            print("Order line:", line)
-            print("Product line:", line['product_id'][0])
             product_data = Product.search_read([('id', '=', line['product_id'][0])], ['name'])
 
-            print("Product:", product_data)
-        
-            order_lines.append({
-                'product_name': product_data[0]['name'],
-                'product_price': line['price_unit'],
-                'quantity': line['product_qty'],  # Quantità acquistata
-                'subtotal': line['price_total']
-            })
+            date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
+            date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
+            
+            # Recupero della data di consegna effettiva da stock.picking
+            pickings = StockPicking.search_read(
+                [('origin', '=', order['name'])], 
+                ['date_done', 'scheduled_date']
+            )
 
-        print("Order Lines: ", order_lines)
-    
-        date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
-        date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
-        
-        for line in order_lines:
+            print(f"Pickings for Order {order['name']}: {pickings}")
+
+            # Calcolo del tempo di consegna o del ritardo
+            if pickings:
+                date_done = pickings[0].get('date_done')
+                scheduled_date = pickings[0].get('scheduled_date')
+                
+                if date_done:
+                    # Se la consegna è stata effettuata
+                    date_done = datetime.strptime(date_done, '%Y-%m-%d %H:%M:%S')
+                    delivery_time = (date_done - date_order).days
+                elif scheduled_date:
+                    # Se non c'è data_done, calcolo del ritardo
+                    scheduled_date = datetime.strptime(scheduled_date, '%Y-%m-%d %H:%M:%S')
+                    delivery_time = (scheduled_date - date_order).days
+                else:
+                    # Se non ci sono date, impostiamo il ritardo come critico
+                    delivery_time = float('inf')  # Rappresenta un ritardo critico
+            else:
+                # Se non ci sono pickings, impostiamo il ritardo come critico
+                delivery_time = float('inf')
+
+            # Aggiungi ai dati
             data.append({
                 'Fornitore': supplier_info['name'],
                 'Email Fornitore': supplier_info['email'],
-                'Prodotto': line['product_name'],
-                'Quantità': line['quantity'],
-                'Prezzo': line['product_price'],
-                'Totale Ordine': line['subtotal'],
+                'Prodotto': product_data[0]['name'],
+                'Quantità': line['product_qty'],
+                'Prezzo': line['price_unit'],
+                'Totale Ordine': line['price_total'],
                 'Data Ordine': date_order,
                 'Data Approvazione': date_approve,
-                'Tempo di Consegna (giorni)': (date_approve - date_order).days,
+                'Data Done': data_done,
+                'Tempo di Consegna (giorni)': delivery_time,
             })
 
-        print("Order Lines: ", data)
-    
+
     df = pd.DataFrame(data)
 
     # Calcolare le performance
     df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
 
+    print("Total df: ", data)
+    
     # Calcolare performance aggregate per fornitore
     performance = df.groupby('Fornitore').agg({
         'Totale Ordine': 'sum',
@@ -380,29 +400,21 @@ def get_supplier_performance_data():
         'Quantità': 'sum',
     }).reset_index()
 
-    # Calcolare performance aggregate per fornitore
-    performance = df.groupby('Fornitore').agg({
-        'Totale Ordine': 'sum',
-        'Tempo di Consegna (giorni)': 'mean',
-        'Quantità': 'sum',
-    }).reset_index()
-
-    # Aggiungere l'indicatore di performance
+    # Aggiungere l'indicatore di performance nella stessa colonna
     def get_performance_indicator(days):
         if days <= 0:
-            return '🟢'  # Buono
+            return f"Buono 🟢"
         elif days <= 5:
-            return '🟠'  # Migliorabile
+            return "Migliorabile 🟠"
         else:
-            return '🔴'  # Critico
+            return "Critico 🔴"
 
     performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)
 
-    performance = performance.sort_values(by='Tempo di Consegna (giorni)')
-
     performance_markdown = performance.to_markdown(index=False)
+    df_markdown = df.to_markdown(index=False)
+    return df_markdown, performance
 
-    return performance_markdown, performance
 
 
 # Funzione per generare il report
@@ -437,45 +449,58 @@ def plot_stock_trend():
     plt.show()
 
 
+def write_pdf(markdown_text, file_name):
+    # Converti il Markdown in HTML
+    html_text = markdown(markdown_text)
 
-def write_pdf(data, file_name):
-
-    # Crea un'istanza di FPDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-
-    # Carica un font che supporta Unicode
-    pdf.add_font('DejaVu', '', 'fonts/DejaVuSans.ttf', uni=True)
-    pdf.set_font('DejaVu', '', 10)
-    # pdf.set_font("Arial", size=10)
-
-    # Impostare il margine orizzontale per il testo
-    pdf.set_left_margin(5)
-    pdf.set_right_margin(5)
-    
-    # Scrivi l'output nel PDF, suddividendolo per linee
-    lines = data.split('\n')
-    for line in lines:
-        pdf.multi_cell(200, 10, line)
-    
     # Ottieni la data e ora corrente
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
-    pdf_file_name = f"{file_name}_{current_time}"
+    pdf_filename = f"{file_name}_{current_time}.pdf"
 
-    # Trova il percorso della directory corrente (utils)
-    current_dir = Path(__file__).resolve().parent
+    # Percorso corretto per salvare i PDF
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))  # Sale fino a challenge_aibot
+    output_dir = os.path.join(base_dir, "static")
+    os.makedirs(output_dir, exist_ok=True)  # Crea la cartella se non esiste
+    pdf_path = os.path.join(output_dir, pdf_filename)
 
-    # Vai su di due livelli e accedi a static
-    static_dir = current_dir.parent.parent / 'static'
+    # Creazione del documento PDF
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
 
-    # Percorso completo per il file PDF
-    pdf_file_path = static_dir / pdf_file_name
+    # Separiamo il testo in righe per individuare la tabella
+    lines = html_text.split("\n")
+    table_data = []
+    inside_table = False
 
-    # Salva il PDF in static
-    pdf.output(str(pdf_file_path))
+    for line in lines:
+        if line.startswith("|"):  # Riconosce le righe della tabella Markdown
+            table_data.append(line.strip().split("|")[1:-1])  # Rimuove i bordi "|"
+            inside_table = True
+        elif inside_table:
+            break  # Fine della tabella
 
-    print(f"PDF salvato come {pdf_file_name}.pdf")
+    if table_data:
+        # Applica uno stile alla tabella
+        table = Table(table_data)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),  # Intestazione grigia
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+            ("GRID", (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 12))
 
+    # Aggiunge il resto del testo che non è nella tabella
+    for line in lines:
+        if not line.startswith("|"):  # Evita di aggiungere due volte le righe della tabella
+            story.append(Paragraph(line, styles["Normal"]))
+            story.append(Spacer(1, 12))
 
+    # Creazione del PDF
+    doc.build(story)
+    print(f"✅ PDF creato: {pdf_path}")

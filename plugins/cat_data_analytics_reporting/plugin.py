@@ -228,7 +228,7 @@ def generate_report_stock_movements(tool_input, cat):
     - Categoria del Prodotto
     - Data Movimento (usa un formato leggibile)
     - Tipo Movimento (🟢 Entrata, 🔴 Uscita)
-    - Quantità (Se la quantità è elevata (es. >100), evidenziarla con un badge per attirare l'attenzione)
+    - Quantità
     - Fornitore (Se il fornitore è sconosciuto, utilizzare un testo in corsivo grigio chiaro per differenziarlo)
     - Indirizzo del Fornitore
     - Email del Fornitore
@@ -262,7 +262,7 @@ def generate_report_stock_movements(tool_input, cat):
     # Rimuovi eventuali formattazioni indesiderate
     output = output.replace("**", "")
 
-    # write_pdf(output, "report_movimenti_magazzino")
+    write_pdf(output, "report_movimenti_magazzino")
 
     return output
 
