@@ -6,9 +6,6 @@ import datetime
 import re
 
 
-# mettere la maggior parte del codice in utils e non in plugin (usare tante funzioni da richiamare)
-# tools richiamati dal bot
-
 @tool(
     return_direct=True,
     examples=[

@@ -2,6 +2,5 @@ pandas
 psycopg2-binary
 odoorpc
 matplotlib
-fpdf2
 reportlab
 markdown

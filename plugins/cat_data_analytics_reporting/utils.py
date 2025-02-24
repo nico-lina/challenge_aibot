@@ -139,26 +139,19 @@ def get_stock_movements():
     Stakeholder = odoo.env['res.partner']
     Location = odoo.env['stock.location']
 
-    moves = StockMove.search_read([], ['product_id', 'date', 'location_id', 'location_dest_id', 'product_uom_qty', 'partner_id'])
+    moves = StockMove.search_read([], ['product_id', 'date', 'location_dest_id', 'product_uom_qty', 'partner_id'])
     
     data = []
 
     for move in moves:
-        print("Move:", move)
         product_id = move['product_id'][0] if move['product_id'] else 'Sconosciuto'
-        print("Product ID:", product_id)
         products = Product.search_read([("id", "=", product_id)], ['name', 'categ_id'])
-        print("Products", products)
         product_name = products[0]['name']
         product_category = products[0]['categ_id'][1] if products[0]['categ_id'] else 'Sconosciuta'
 
-        print(move['location_dest_id'][0])
         locations = Location.search_read([("id", "=", move['location_dest_id'][0])], ['id', 'usage'])
         location = locations[0]
-        print("Location Dest:", location)
         movement_type = '🟢 Entrata' if location['usage'] == 'internal' else '🔴 Uscita'
-
-        print("mov type:", movement_type)
 
         # Convertire la stringa in un oggetto datetime
         move_date = datetime.strptime(move['date'], "%Y-%m-%d %H:%M:%S")
@@ -166,22 +159,15 @@ def get_stock_movements():
         # Estrarre solo il giorno
         move_date = move_date.date()
 
-        print("Data:", move['date'])
-        print("Data:", type(move['date']))
-        print("Data:", move_date)
-
         if move['partner_id']:
             # Usa l'ID del partner invece del nome
             stk_id = move['partner_id'][0]
-
-            print("Stk id:", stk_id)
 
             # Ottenere più informazioni sul partner
             stakeholders = Stakeholder.search_read([("id", "=", stk_id)], ['name', 'street', 'email'])
             stakeholder_name = stakeholders[0]['name']
             stakeholder_address = stakeholders[0].get('street', 'Non disponibile')
             stakeholder_email = stakeholders[0].get('email', 'Non disponibile')
-            print(stakeholders)
         else:
             stakeholder_name = "Non disponibile"
             stakeholder_address = "Non disponibile"
