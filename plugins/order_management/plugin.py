@@ -160,41 +160,6 @@ class OrderForm(SuperCatForm):
         
 
 
-# @tool (
-#     return_direct=True,
-#     examples=[
-#         "Conferma l'ordine con ID 1,2,3",
-#         "Approva l'ordine 1,3,4",
-#         "Accetta l'ordine 1,2,3",
-#         "Conferma l'ordine 1,2,4",
-#         "Completa l'ordine 1,5,6",
-#         "Finalizza l'ordine 1,3,4",
-#         "Concludi l'ordine 1, 2,3"
-#         ]
-# )
-
-# def confirm_orders_tool(tool_input, cat):
-#     """Gestisce la conferma di uno o più più ordini, restituendo successi ed errori."""
-#     result = []
-#     order_ids = tool_input.split(',')
-
-#     for order_id in order_ids:
-#         try:
-#             order_id = int(order_id.strip())
-#             result.append(confirm_order(order_id))
-#         except ValueError:
-#             result.append(f"Errore: ID ordine {order_id} non valido. Inserisci un numero intero.")
-    
-#     output = cat.llm(
-#         f"""Scrivi in modo chiaro per l'utente i risultati delle conferme degli ordini. 
-#         Che sono contenuti in questo elenco. 
-#         Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
-
-#         {result}
-#         """, stream=True)
-    
-#     return output.replace("**", "")
-
 @tool (
     return_direct=True,
     examples=[

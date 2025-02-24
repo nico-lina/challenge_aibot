@@ -175,49 +175,6 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
 
 
 
-
-
-# def confirm_order(order_id):
-#     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-
-#     # Autenticazione
-#     db = 'db_test'
-#     username = 'prova@prova'
-#     password = 'password'
-#     odoo.login(db, username, password)
-
-#     PurchaseOrder = odoo.env['purchase.order']
-#     StockMove = odoo.env['stock.move']
-
-#     try:
-#         order = PurchaseOrder.browse(order_id)
-#         if not order.exists():
-#             return f"Errore: Ordine ID {order_id} non trovato."
-
-#         if order.state != 'draft':  # Assumiamo che 'draft' corrisponda a 'Bozza'
-#             return f"Errore: Ordine ID {order_id} non in stato 'Bozza' ma '{order.state}'."
-
-#         # Conferma l'ordine
-#         order.write({
-#             'state': 'purchase',
-#             'date_approve': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-#         })
-
-#         # Trova i movimenti di magazzino associati
-#         moves = StockMove.search([('purchase_line_id', 'in', order.order_line.ids), ('state', '=', 'draft')])
-#         print("MOVES: ", moves)
-#         # Aggiorna lo stato dei movimenti di magazzino per essere conteggiati nella quantità prevista
-#         if moves:
-#             move_records = StockMove.browse(moves)
-#             move_records.write({'state': 'assigned', 'location_final_id': 8, 'picking_id':16, 'group_id':4, 'picking_type_id':1, 'warehouse_id': 1, 'quantity':10, 'price_unit' : 1000 })  # Imposta lo stato come 'confirmed' senza modificare la quantità
-        
-#         return f"Successo: Ordine ID {order_id} confermato e movimenti di magazzino aggiornati."
-
-#     except Exception as e:
-#         return f"Errore: impossibile confermare l'ordine ID {order_id}. Dettaglio: {str(e)}"
-
-
-
 def complete_order(order_id):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
     
@@ -235,8 +192,8 @@ def complete_order(order_id):
         if not order.exists():
             return f"Errore: Ordine ID {order_id} non trovato."
         
-        if order.state != 'purchase':  
-            return f"Errore: Ordine ID {order_id} non in stato 'Acquistato' ma '{order.state}'."
+        if order.state != 'draft':  
+            return f"Errore: Ordine ID {order_id} non in stato 'Draft' ma '{order.state}'."
         
         # Aggiorna direttamente la quantità disponibile dei prodotti in magazzino
         for line in order.order_line:
