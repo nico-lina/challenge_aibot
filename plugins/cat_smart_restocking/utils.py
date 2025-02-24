@@ -5,6 +5,9 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
+import telepot
+import mailslurp_client
+from mailslurp_client import ApiClient, SendEmailOptions
 
 
 def connect(db):
@@ -173,7 +176,82 @@ def suggest_reorder_date(name, months_ahead=3):
             current_stock -= avg_daily_demand
             reorder_date += timedelta(days=1)
         
-        reorder_dates[product_name] = reorder_date.strftime('%Y-%m-%d')
+        reorder_dates = reorder_date.strftime('%Y-%m-%d')
 
     return reorder_dates
+
+
+
+# Configurazione API MailSlurp
+# def send_mail(mail_text, mail_sbj):
+#     # Configura l'API
+#     configuration = mailslurp_client.Configuration()
+#     configuration.api_key["x-api-key"] = (
+#         ""
+#     )
+
+#     with ApiClient(configuration) as api_client:
+#         api_instance = mailslurp_client.InboxControllerApi(api_client)
+
+#         # Crea una email temporanea
+#         inbox = api_instance.create_inbox()
+#         print(f"Indirizzo email temporaneo: {inbox.email_address}")
+
+#         # Invia email dall'inbox creato
+#         send_options = SendEmailOptions(
+#             to=["camilla.casaleggi@gmail.com"],
+#             subject=mail_sbj,
+#             body=mail_text,
+#             is_html=True,
+#         )
+
+#         api_instance.send_email(inbox.id, send_options)
+
+def send_telegram_notification(telegram_text):
+    TOKEN = "8042065744:AAF-t4WC2Gb5t7ckcYMGnmTXJmYPtZNuXzM"
+    bot = telepot.Bot(TOKEN)
+    bot.sendMessage(7878972936, telegram_text, parse_mode="HTML")
+
+# Funzione principale per gestire gli ordini ai fornitori
+def process_supplier_orders(prodotto):
+
+    odoo = get_odoo_connection()
+    ResPartner = odoo.env['res.partner']
+    PurchaseLine = odoo.env['purchase.order.line']
+
+    # Recupero dati di stock e ordini
+    order_data = PurchaseLine.search_read([('name', '=', prodotto)], ['partner_id', 'name'])
+    supplier_data = ResPartner.search_read([], ['complete_name', 'commercial_partner_id', 'email'])
+
+    order_df = pd.DataFrame(order_data)
+    suppliers_df = pd.DataFrame(supplier_data)
+
+    suppliers_df.rename(columns={'commercial_partner_id': 'partner_id'}, inplace=True)
+    suppliers_df.rename(columns={'complete_name': 'supplier_name'}, inplace=True)
+
+    print(suppliers_df)
+
+    suppliers_df = suppliers_df.merge(order_df, on='partner_id', how='left')
+
+    for supplier in suppliers_df:
+        product = supplier["name"]
+        
+        reorder_date = suggest_reorder_date(product, 3)
+        
+        if reorder_date[product] <= datetime.today().strftime('%Y-%m-%d'):
+            return supplier["email"]
+
+# Monitoraggio delle prestazioni dei fornitori
+# def track_supplier_performance(supplier_id, delivery_date, expected_date, quality_rating, performance_db):
+#     delay = (delivery_date - expected_date).days
+#     performance_db.append({
+#         "supplier_id": supplier_id,
+#         "delivery_date": delivery_date,
+#         "expected_date": expected_date,
+#         "delay": delay,
+#         "quality_rating": quality_rating,
+#     })
+    
+#     if delay > 3:
+#         send_telegram_notification(119405630, f"⚠️ Ritardo nella consegna da {supplier_id}: {delay} giorni di ritardo!")
 
