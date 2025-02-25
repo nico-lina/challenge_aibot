@@ -6,8 +6,10 @@ import numpy as np
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
 import telepot
-import mailslurp_client
-from mailslurp_client import ApiClient, SendEmailOptions
+# import smtplib
+# from email.mime.multipart import MIMEMultipart
+# from email.mime.text import MIMEText
+# import os
 
 
 def connect(db):
@@ -130,7 +132,7 @@ def suggest_reorder_date(name, months_ahead=3):
 
     # Recupero dati di stock e ordini
     stock_data = StockWarehouse.search_read([('product_id', '=', id['id'])], ['product_id', 'product_min_qty', 'product_max_qty'])
-    order_data = PurchaseLine.search_read([('product_id', '=', id['id'])], ['product_id', 'name', 'product_qty', 'create_date', 'date_planned'])
+    order_data = PurchaseLine.search_read([('product_id', '=', id['id'])], ['product_id', 'name', 'product_qty', 'date_planned'])
 
     stock_df = pd.DataFrame(stock_data)
     order_df = pd.DataFrame(order_data)
@@ -138,7 +140,7 @@ def suggest_reorder_date(name, months_ahead=3):
     if stock_df.empty:
         raise ValueError("Nessun dato di stock disponibile.")
     
-    order_df.rename(columns={'create_date': 'date_order'}, inplace=True)
+    order_df.rename(columns={'date_planned': 'date_order'}, inplace=True)
     order_df['date_order'] = pd.to_datetime(order_df['date_order'])
 
     for i in range(len(stock_df)):
@@ -176,36 +178,38 @@ def suggest_reorder_date(name, months_ahead=3):
             current_stock -= avg_daily_demand
             reorder_date += timedelta(days=1)
         
-        reorder_dates = reorder_date.strftime('%Y-%m-%d')
+        reorder_dates[product_name] = reorder_date.strftime('%Y-%m-%d')
 
     return reorder_dates
 
 
 
-# Configurazione API MailSlurp
-# def send_mail(mail_text, mail_sbj):
-#     # Configura l'API
-#     configuration = mailslurp_client.Configuration()
-#     configuration.api_key["x-api-key"] = (
-#         ""
-#     )
+# def send_mail(mail_text, mail_sbj, recipient_email):
+#     """
+#     Invia un'email al fornitore con le informazioni per il riordino.
+#     """
 
-#     with ApiClient(configuration) as api_client:
-#         api_instance = mailslurp_client.InboxControllerApi(api_client)
+#     # Configura le credenziali (meglio impostarle come variabili d'ambiente per sicurezza)
+#     sender_email = os.getenv("SMTP_EMAIL", "camilla.casaleggi@gmail.com")
+#     sender_password = os.getenv("SMTP_PASSWORD", "fbtsrdirhiopcdvs")
+#     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+#     smtp_port = int(os.getenv("SMTP_PORT", 587))
 
-#         # Crea una email temporanea
-#         inbox = api_instance.create_inbox()
-#         print(f"Indirizzo email temporaneo: {inbox.email_address}")
+#     # Configura il messaggio email
+#     msg = MIMEMultipart()
+#     msg["From"] = sender_email
+#     msg["To"] = recipient_email
+#     msg["Subject"] = mail_sbj
+#     msg.attach(MIMEText(mail_text, "html"))  # Email in formato HTML
 
-#         # Invia email dall'inbox creato
-#         send_options = SendEmailOptions(
-#             to=["camilla.casaleggi@gmail.com"],
-#             subject=mail_sbj,
-#             body=mail_text,
-#             is_html=True,
-#         )
+#     # Connessione al server SMTP
+#     server = smtplib.SMTP(smtp_server, smtp_port)
+#     server.starttls()  # Abilita la crittografia TLS
+#     server.login(sender_email, sender_password)  # Login con credenziali
+#     server.sendmail(sender_email, recipient_email, msg.as_string())  # Invia email
+#     server.quit()  # Chiudi connessione
 
-#         api_instance.send_email(inbox.id, send_options)
+#     print(f"✅ Email inviata con successo a {recipient_email}")
 
 def send_telegram_notification(telegram_text):
     TOKEN = "8042065744:AAF-t4WC2Gb5t7ckcYMGnmTXJmYPtZNuXzM"

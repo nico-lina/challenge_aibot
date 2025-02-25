@@ -3,4 +3,3 @@ psycopg2-binary
 tabulate
 odoorpc
 telepot
-mailslurp_client
