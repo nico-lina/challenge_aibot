@@ -1,0 +1,7 @@
+pandas
+psycopg2-binary
+odoorpc
+matplotlib
+fpdf2
+markdown
+reportlab

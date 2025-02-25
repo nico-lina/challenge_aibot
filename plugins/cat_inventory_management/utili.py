@@ -105,7 +105,7 @@ def get_warehouse():
     return mark, df
 
 
-def create_product(product_name, product_qty, product_min_qty, product_description):
+def create_product(product_name, product_qty, product_min_qty, product_description, product_price):
     odoo = odoorpc.ODOO("host.docker.internal", port=8069)
 
     # Autenticazione
@@ -125,7 +125,8 @@ def create_product(product_name, product_qty, product_min_qty, product_descripti
             "is_storable": True,
             "categ_id": 1,
             "description": product_description,
-
+            "type" : 'consu',
+            "standard_price" : product_price
         }
     )
 

@@ -236,7 +236,6 @@ def get_country_id(country, threshold = 85):
     }
 
 
-#TODO mettere la tabella completa e far fillare i campi in base al curriculum
 def complete_secondary_info(employee, stringa):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
     db = 'db_test'

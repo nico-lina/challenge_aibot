@@ -44,25 +44,27 @@ def get_the_warehouse_status(tool_input, cat):
 @tool(
     return_direct=True,
     examples=[
-        "Aggiungi il prodotto con quantità disponibile iniziale e quantità minima di riordino"
+        "Aggiungi il prodotto con quantità disponibile iniziale e quantità minima di riordino e prezzo unitario"
     ],
 )
 def create_new_product(tool_input, cat):
-    """Crea un nuovo prodotto nel magazzino con la quantità specificata e la soglia di riordino.
+    """Crea un nuovo prodotto nel magazzino con la quantità specificata e la soglia di riordino e prezzo unitario.
 
     Questo tool prende in input il nome del prodotto, la quantità disponibile iniziale e la quantità minima per il riordino.
     Gli input devono essere forniti nel seguente formato:
     - Il primo valore è una stringa contenente il nome del prodotto.
     - Il secondo valore è un numero intero o decimale che rappresenta la quantità iniziale disponibile.
     - Il terzo valore è un numero intero o decimale che indica la quantità minima per il riordino.
+    - Il quarto valore è il prezzo unitario del prodotto
 
     """
 
-    product_name, product_qty, product_min_qty = tool_input.split(",")
+    product_name, product_qty, product_min_qty, product_price = tool_input.split(",")
 
     product_name = product_name.replace(" ", "")
     product_qty = float(product_qty.replace(" ", ""))
     product_min_qty = product_min_qty.replace(" ", "")
+    product_price = product_price.replace(" ", "")
     product_description = (
         cat.llm(
             f"Genera una descrizione per il prodotto farmaceutico che si chiama {product_name} formattata in HTML, scrivi solamente il codice senza aggiungere assolutamente nessun'altra frase"
@@ -72,7 +74,7 @@ def create_new_product(tool_input, cat):
     )
 
     result, link = create_product(
-        product_name, product_qty, product_min_qty, product_description
+        product_name, product_qty, product_min_qty, product_description, product_price
     )
     if result == True:
         print(link)

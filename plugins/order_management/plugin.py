@@ -75,7 +75,7 @@ def get_order_status(tool_input, cat):
 
 class OrderLine(BaseModel):
     product: str = Field(..., description = "Nome del prodotto da ordinare")
-    quantity: int = Field(...)
+    quantity: int = Field(..., gt = 0)
 
     @validator("product")
     @classmethod
@@ -94,7 +94,7 @@ class OrderLine(BaseModel):
 
 class Order(BaseModel):
     supplier_name: str = Field(...)
-    order_lines: list[OrderLine] 
+    order_lines: list[OrderLine] = Field(..., min_items=1, description="Deve contenere almeno un prodotto")
     currency : int = 125
 
     @validator("supplier_name")
@@ -128,7 +128,7 @@ class OrderForm(SuperCatForm):
             if not product_data:
                 return {"output": f"Errore: Il prodotto '{line['product']}' non esiste."}
             order_lines_data.append((product_data['id'], line["quantity"], product_data['price'], product_data['name']))
-        nome_ordine = f"In base alle informazioni dei prodotti forniti: {order_lines_data}, crea un nome per l'ordine. Per esempio Ordine per {line['product']}, IN OUTPUT VOGLIO SOLO UNA STRINGA CON IL NOME DELL'ORDINE"
+        nome_ordine = f"In base alle informazioni dei prodotti forniti: {order_lines_data}, crea un nome per l'ordine in questo modo P001, per farlo univoco usa l'id dell'ordine contenuto nelle informazioni dei prodotti. , IN OUTPUT VOGLIO SOLO UNA STRINGA CON IL NOME DELL'ORDINE"
         result = generate_order(
             partner_id=partner_id,
             order_lines=order_lines_data,
@@ -157,7 +157,12 @@ class OrderForm(SuperCatForm):
         )
         return {"output": f"{self.cat.llm(prompt)}"}
 
-        
+    def message_closed(self):
+        prompt = (
+            f"L'utente non vuole più creare l'ordine, scrivigli che stai uscendo dal form"
+        )
+
+        return {"output": f"{self.cat.llm(prompt)}"}
 
 
 @tool (

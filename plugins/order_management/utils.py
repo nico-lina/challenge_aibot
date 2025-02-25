@@ -1,8 +1,9 @@
 import pandas as pd
 import odoorpc
 import psycopg2 as psql
-from datetime import datetime
+from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
+import random
 
 def get_orders():
     """Recupera gli ordini da Odoo e restituisce una tabella formattata."""
@@ -98,9 +99,7 @@ def get_product_by_name(product_name):
 
 def generate_order(partner_id, order_lines, name, currency_id, company_id=1, user_id=2):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
-    print("Partner id", partner_id)
-    print("Order lines", order_lines)
-    print("Name", name)
+    
     # Autenticazione
     db = 'db_test'
     username = 'prova@prova'
@@ -110,6 +109,7 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
     # Modelli Odoo
     PurchaseOrder = odoo.env['purchase.order']
     PurchaseOrderLine = odoo.env['purchase.order.line']
+    StockPicking = odoo.env['stock.picking']
 
     current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -122,10 +122,23 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
         'company_id': company_id,
         'state': 'draft',
         'date_order': current_datetime,
+        'date_approve' : current_datetime,
         'amount_total': sum(qty * price for _, qty, price,_ in order_lines),
         'name': name,
     })
 
+    picking_id = StockPicking.create({
+    'scheduled_date': current_datetime, #TODO aggiungere la data attesa
+    'location_id': 4,
+    'location_dest_id': 8,
+    'origin': name,
+    'company_id': company_id,
+    'partner_id' : partner_id,
+    'picking_type_id': 1,
+    'company_id': 1,
+    'state': 'draft'
+    })
+    
     order_lines_data = []
 
     # Creazione delle linee d'ordine
@@ -137,7 +150,7 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
             'price_unit': price_unit,
             'price_subtotal': product_qty * price_unit,
             'price_total': product_qty * price_unit,
-            'date_planned': current_datetime,
+            'date_planned': current_datetime, 
         })
 
         # Salviamo i dettagli delle righe ordine
@@ -175,6 +188,9 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
 
 
 
+#TODO creare campo expiration date e impostarlo, poi utilizzarlo per filtrare come parte della chiave primaria in stock quant
+#TODO campi da usare date_order, date_approve, date_planned -> creo l'ordine, effective_date -> quando confermo
+#TODO campo effective_date settato, togliere lo stock picking
 def complete_order(order_id):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
     
@@ -186,43 +202,75 @@ def complete_order(order_id):
     
     PurchaseOrder = odoo.env['purchase.order']
     StockQuant = odoo.env['stock.quant']
+    StockMove = odoo.env['stock.move']
+    StockPicking = odoo.env['stock.picking']
+
+    expiration_date = datetime.now() + timedelta(days=random.randint(30, 180))
+    expiration_date_str = expiration_date.strftime('%Y-%m-%d')
     
-    try:
-        order = PurchaseOrder.browse(order_id)
-        if not order.exists():
-            return f"Errore: Ordine ID {order_id} non trovato."
-        
-        if order.state != 'draft':  
-            return f"Errore: Ordine ID {order_id} non in stato 'Draft' ma '{order.state}'."
+    #try:
+    order = PurchaseOrder.browse(order_id)
+    if not order.exists():
+        return f"Errore: Ordine ID {order_id} non trovato."
+    
+    if order.state != 'draft':  
+        return f"Errore: Ordine ID {order_id} non in stato 'Draft' ma '{order.state}'."
+    print(order.name)
+    picking_ids = StockPicking.search([
+        ('origin', '=', order.name),
+        ('state', '=', 'draft')
+    ])
+    if not picking_ids:
+        return f"Errore: Nessun stock picking associato all'ordine ID {order_id}."
+
+    picking = StockPicking.browse(picking_ids[0])  # Prendiamo il primo risultato
+    picking.write({
+        'date_done': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'state': 'done'
+    })
+    picking.button_validate()
+
+    for line in order.order_line:
+        product = line.product_id
+        location_id = 4  # Location di partenza
+        location_dest_id = 8  # Location di destinazione
+        partner_id = order.partner_id.id
+        product_uom_qty = line.product_qty
+        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         # Aggiorna direttamente la quantità disponibile dei prodotti in magazzino
-        for line in order.order_line:
-            product = line.product_id
-            location_id = order.picking_type_id.default_location_dest_id.id  # Magazzino di destinazione
-            
-            if not location_id:
-                return f"Errore: Nessun magazzino di destinazione trovato per l'ordine {order_id}."
-            
-            quant = StockQuant.search([('product_id', '=', product.id), ('location_id', '=', location_id)])
-            
-            if quant:
-                quant_record = StockQuant.browse(quant[0])
-                quant_record.write({'quantity': quant_record.quantity + line.product_qty})
-            else:
-                # Se non esiste una riga stock.quant per questo prodotto e magazzino, la creiamo
-                StockQuant.create({
-                    'product_id': product.id,
-                    'location_id': location_id,
-                    'quantity': line.product_qty
-                })
+        quant = StockQuant.search([('product_id', '=', product.id), ('location_id', '=', location_dest_id), ('expiration_date', '=', expiration_date_str)])
         
-        # Segna l'ordine come completato
-        order.write({'state': 'done'})
+        if quant:
+            quant_record = StockQuant.browse(quant[0])
+            quant_record.write({'quantity': quant_record.quantity + product_uom_qty})
+        else:
+            StockQuant.create({
+                'product_id': product.id,
+                'location_id': location_dest_id,
+                'quantity': product_uom_qty,
+                'expiration_date' : expiration_date_str
+            })
         
-        return f"Successo: Ordine ID {order_id} completato e quantità di prodotto aggiornata in magazzino."
+        # Creazione del movimento di magazzino
+        StockMove.create({
+            'product_id': product.id,
+            'location_id': location_id,
+            'location_dest_id': location_dest_id,
+            'partner_id': partner_id,
+            'product_uom_qty': product_uom_qty,
+            'date': current_date,
+            'name': f"ordine {product.id}", 
+            'picking_id' : picking.id
+        })
+        
+    # Segna l'ordine come completato
+    order.write({'state': 'purchase'})
     
-    except Exception as e:
-        return f"Errore: impossibile completare l'ordine ID {order_id}. Dettaglio: {str(e)}"
+    return f"Successo: Ordine ID {order_id} completato, quantità aggiornata e movimento di magazzino creato."
+    
+    #except Exception as e:
+    #    return f"Errore: impossibile completare l'ordine ID {order_id}. Dettaglio: {str(e)}"
 
 
 def delete_order(order_id):
@@ -241,7 +289,7 @@ def delete_order(order_id):
         if not order.exists():
             return f"Errore: Ordine ID {order_id} non trovato."
         
-        if order.state != 'draft':  # Assumiamo che 'draft' corrisponda a 'Bozza'
+        if order.state != 'draft':  
             return f"Errore: Ordine ID {order_id} non in stato 'Bozza' ma '{order.state}'."
         
         # Conferma l'ordine
@@ -280,7 +328,7 @@ def auto_order():
         max_qty = orderpoint['product_max_qty']
         
         # Recupera la quantità attuale a magazzino per il prodotto
-        quants = StockQuant.search_read([('product_id', '=', product_id)], ['quantity'])
+        quants = StockQuant.search_read([('product_id', '=', product_id), ('quantity', '>=', 0)], ['quantity'])
         current_qty = sum(q['quantity'] for q in quants)
         
         if current_qty < min_qty:
