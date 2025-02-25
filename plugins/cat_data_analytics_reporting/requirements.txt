@@ -4,3 +4,4 @@ odoorpc
 matplotlib
 reportlab
 markdown
+beautifulsoup4
