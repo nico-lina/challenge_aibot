@@ -13,7 +13,6 @@ from .utili import (
     send_telegram_notification,
 )
 
-
 @tool(
     return_direct=True,
     examples=[
@@ -77,7 +76,6 @@ def create_new_product(tool_input, cat):
         product_name, product_qty, product_min_qty, product_description, product_price
     )
     if result == True:
-        print(link)
         output = f'Ho creato il prodotto <a href="{link}" target="_blank"> {product_name}</a>'
         return output
     else:
@@ -88,7 +86,6 @@ def create_new_product(tool_input, cat):
 def send_mail_to_wh_manager(tool_input, cat):
     """Invia una mail per notificare i prodotti che stanno per finire al responsabile di magazzino"""
     _, df = get_warehouse()
-    print("DATAFRAME", df)
     df["Quantità Da Riordinare"] = (
         df["Quantità Disponibile"]
         - df["Quantità Riservata"]
@@ -188,9 +185,9 @@ vecchi fornitori inseriti.
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il fornitore nel sistema? Rispondi dicendo Si puoi inserirlo'"
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
         )
 
-        print(self._state)
         return {"output": f"{self.cat.llm(prompt)}"}
 
     def message_incomplete(self):
@@ -198,9 +195,19 @@ vecchi fornitori inseriti.
             f"Nel form mancano alcuni dettagli:\n{self._generate_base_message()}\n"
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
-            form di inserimento del fornitore"""
+            form di inserimento del fornitore
+            Rispondi con una risposta diretta senza aggiungere commenti tuoi"""
         )
         return {"output": f"{self.cat.llm(prompt)}"}
+    
+    def message_closed(self):
+        prompt = (
+            f"""L'utente non vuole più creare il fornitore, scrivigli che stai uscendo dal form di creazione del fornitore. 
+            Rispondi con una risposta diretta senza aggiungere commenti tuoi"""
+        )
+
+        return {"output": f"{self.cat.llm(prompt)}"}
+
 
 
 class Customer(BaseModel):
@@ -247,11 +254,11 @@ vecchi clienti inseriti.
 
     def submit(self, form_data):
         customer_type = self.cat.llm(f"""Prendi questo valore: '{form_data["customer_type"]}'
-e capisci se si tratta di una persona fisica o di un'azienda.
-Se si tratta di una persona fisica restituisci person altrimenti company.
+        e capisci se si tratta di una persona fisica o di un'azienda.
+        Se si tratta di una persona fisica restituisci person altrimenti company.
 
-Rispondi solo person o company
-""")
+        Rispondi solo person o company
+        """)
         result, link = create_customer(
             customer_name=form_data["customer_name"],
             customer_street=form_data["customer_street"],
@@ -275,9 +282,10 @@ Rispondi solo person o company
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il cliente nel sistema? Rispondi dicendo Si puoi inserirlo'"
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+
         )
 
-        print(self._state)
         return {"output": f"{self.cat.llm(prompt)}"}
 
     def message_incomplete(self):
@@ -286,5 +294,16 @@ Rispondi solo person o company
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il 
             form di inserimento del cliente. Digli che il tipo di cliente può essere solo o persona fisica o azienda"""
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+
         )
         return {"output": f"{self.cat.llm(prompt)}"}
+    
+    def message_closed(self):
+        prompt = (
+            f"""L'utente non vuole più creare il cliente, scrivigli che stai uscendo dal form di creazione del cliente. 
+            Rispondi con una risposta diretta senza aggiungere commenti tuoi"""
+        )
+
+        return {"output": f"{self.cat.llm(prompt)}"}
+

@@ -6,12 +6,14 @@ from datetime import datetime
 from pathlib import Path
 import math
 from markdown import markdown
-from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
 import os
 import time
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+import re
+from bs4 import BeautifulSoup
 
 
 
@@ -25,33 +27,6 @@ def connect_to_odoo():
     return odoo
 
 
-# Panoramica generale dello stock
-def get_stock_overview():
-
-    odoo = connect_to_odoo()
-    
-    Product = odoo.env['product.product']
-    StockQuant = odoo.env['stock.quant']
-    
-    products = Product.search_read([], ['id', 'name', 'standard_price'])
-    quants = StockQuant.search_read([], ['product_id', 'quantity'])
-    
-    total_products = len(products)
-    total_stock_value = sum(p['standard_price'] * q['quantity'] for p in products for q in quants if q['product_id'] and q['product_id'][0] == p['id'])
-    total_quantity = sum(q['quantity'] for q in quants)
-
-    data = [{
-        "Totale Prodotti": total_products,
-        "Quantità Totale Disponibile": total_quantity,
-        "Valore Totale Stock (€)": round(total_stock_value, 2)
-    }]
-
-    df = pd.DataFrame(data)
-
-    df_markdown = df.to_markdown(index=False)
-    
-    return df_markdown, df
-
 
 # Dettaglio stock per prodotto
 def get_stock_report():
@@ -63,7 +38,7 @@ def get_stock_report():
     OrderPoint = odoo.env['stock.warehouse.orderpoint']
     ProductCategory = odoo.env['product.category']
     
-    products = Product.search_read([], ['id', 'name', 'categ_id', 'standard_price'])
+    products = Product.search_read([('type', '=', 'consu')], ['id', 'name', 'categ_id', 'standard_price', 'default_code'])
     quants = StockQuant.search_read([('quantity', '>=', 0)], ['product_id', 'location_id', 'quantity'])
     
     stock_data = {}
@@ -77,6 +52,8 @@ def get_stock_report():
     for product in products:
         product_id = product['id']
         product_name = product['name']
+        product_code = product['default_code']
+        product_code = product_code if product_code else "Non Disponibile"
 
         # Recupera l'ID della categoria
         categ_id = product['categ_id'][0] if product['categ_id'] else None
@@ -113,6 +90,7 @@ def get_stock_report():
 
         data.append({
             'Nome Prodotto': product_name,
+            'Codice Prodotto': product_code,
             'Categoria': category,
             'Quantità Disponibile': quantity,
             'Soglia Minima': min_quantity,
@@ -139,15 +117,17 @@ def get_stock_movements():
     Stakeholder = odoo.env['res.partner']
     Location = odoo.env['stock.location']
 
-    moves = StockMove.search_read([], ['product_id', 'date', 'location_id', 'location_dest_id', 'product_uom_qty', 'partner_id'])
+    moves = StockMove.search_read([], ['product_id', 'date', 'location_dest_id', 'product_uom_qty', 'partner_id'])
     
     data = []
 
     for move in moves:
         product_id = move['product_id'][0] if move['product_id'] else 'Sconosciuto'
-        products = Product.search_read([("id", "=", product_id)], ['name', 'categ_id'])
+        products = Product.search_read([("id", "=", product_id)], ['name', 'categ_id', 'default_code'])
         product_name = products[0]['name']
         product_category = products[0]['categ_id'][1] if products[0]['categ_id'] else 'Sconosciuta'
+        product_code = products[0]['default_code']
+        product_code = product_code if product_code else "Non Disponibile"
 
         locations = Location.search_read([("id", "=", move['location_dest_id'][0])], ['id', 'usage'])
         location = locations[0]
@@ -174,8 +154,8 @@ def get_stock_movements():
             stakeholder_email = "Non disponibile" 
 
         data.append({
-            'Prodotto ID': product_id,
             'Nome del Prodotto': product_name,
+            'Codice del Prodotto': product_code,
             'Categoria Prodotto': product_category,
             'Data': move_date,
             'Tipo Movimento': movement_type,
@@ -186,214 +166,103 @@ def get_stock_movements():
         })
 
     df = pd.DataFrame(data)
-    df = df.sort_values(by='Data')
 
     df_markdown = df.to_markdown(index=False)
 
     return df_markdown, df
 
 
-def get_supplier_performance_data_2():
-    try:
-        odoo = connect_to_odoo()
-
-        Purchase = odoo.env['purchase.order']
-        Supplier = odoo.env['res.partner']
-        Product = odoo.env['product.product']
-        OrderLine = odoo.env['purchase.order.line']
-    
-        # Estrazione degli ordini di acquisto completati o confermati
-        purchase_orders = Purchase.search_read(
-            [("state", "in", ['purchase', 'done'])], 
-            ['partner_id', 'date_order', 'date_approve', 'order_line', 'state']
-        )
-
-        data = []
-
-        for order in purchase_orders:
-            # Dettagli fornitore
-            supplier_id = order['partner_id'][0]
-            supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
-            supplier_info = supplier_data[0] if supplier_data else {'name': 'Sconosciuto', 'email': 'N/A'}
-
-            order_lines = []
-            for line_id in order['order_line']:
-                lines = OrderLine.search_read([('id', '=', line_id)], 
-                                              ['product_id', 'product_qty', 'price_unit', 'price_total'])
-                if not lines:
-                    continue
-
-                line = lines[0]
-                product_data = Product.search_read([('id', '=', line['product_id'][0])], ['name'])
-                product_name = product_data[0]['name'] if product_data else 'Prodotto Sconosciuto'
-
-                order_lines.append({
-                    'product_name': product_name,
-                    'product_price': line['price_unit'],
-                    'quantity': line['product_qty'],
-                    'subtotal': line['price_total']
-                })
-
-            date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
-            date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
-            delivery_time = max((date_approve - date_order).days, 0)
-
-            for line in order_lines:
-                data.append({
-                    'Fornitore': supplier_info['name'],
-                    'Email Fornitore': supplier_info.get('email', 'N/A'),
-                    'Prodotto': line['product_name'],
-                    'Quantità': line['quantity'],
-                    'Prezzo': line['product_price'],
-                    'Totale Ordine': line['subtotal'],
-                    'Data Ordine': date_order,
-                    'Data Approvazione': date_approve,
-                    'Tempo di Consegna (giorni)': delivery_time,
-                    'Stato Ordine': order['state'],  # Nuova colonna per lo stato
-                })
-
-        # Creazione del DataFrame
-        df = pd.DataFrame(data)
-
-        # Calcolare performance aggregate per fornitore
-        performance = df.groupby('Fornitore').agg({
-            'Totale Ordine': 'sum',
-            'Tempo di Consegna (giorni)': 'mean',
-            'Quantità': 'sum',
-        }).reset_index()
-
-        # Calcolare performance aggregate per fornitore
-        performance = df.groupby('Fornitore').agg({
-            'Totale Ordine': 'sum',
-            'Tempo di Consegna (giorni)': 'mean',
-            'Quantità': 'sum',
-        }).reset_index()
-
-        # Aggiungere l'indicatore di performance
-        def get_performance_indicator(days):
-            if days <= 0:
-                return '🟢'  # Buono
-            elif days <= 5:
-                return '🟠'  # Migliorabile
-            else:
-                return '🔴'  # Critico
-
-        performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)
-
-        performance = performance.sort_values(by='Tempo di Consegna (giorni)')
-
-        # Generazione del markdown per la visualizzazione
-        performance_markdown = performance.to_markdown(index=False)
-
-        return performance_markdown, performance
-
-    except Exception as e:
-        print(f"Errore durante l'estrazione delle performance dei fornitori: {e}")
-        return None, None
-
-
+# Aggiungere l'indicatore di performance nella stessa colonna
+def get_performance_indicator(days):
+    if days <= 0:
+        return f"🟢 Buono"
+    elif days <= 5:
+        return "🟠 Migliorabile"
+    else:
+        return "🔴 Critico"
 
 
 def get_supplier_performance_data():
-    
     odoo = connect_to_odoo()
 
     Purchase = odoo.env['purchase.order']
     Supplier = odoo.env['res.partner']
     Product = odoo.env['product.product']
     OrderLine = odoo.env['purchase.order.line']
-    StockPicking = odoo.env['stock.picking']
 
-   # Estrazione degli ordini di acquisto completati o confermati
-    purchase_orders = Purchase.search_read(
-        [("state", "in", ['purchase', 'done', 'sent'])], 
-        ['name', 'partner_id', 'date_order', 'date_approve', 'order_line', 'state']
-    )
+    # Estrazione degli ordini di acquisto completati e ricevuti (state = done)
+    purchase_orders = Purchase.search_read([('state', 'in', ['done', 'purchase'])], ['name', 'partner_id', 'order_line', 'effective_date', 'date_planned', 'date_order'])
+
     data = []
 
     for order in purchase_orders:
-        
-        # Ottenere i dettagli dei fornitori
+
+        # Ottenere i dettagli del fornitore
         supplier_id = order['partner_id'][0]
         supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
         supplier_info = supplier_data[0]
 
+    
         for line_id in order['order_line']:
             lines = OrderLine.search_read([('id', '=', line_id)], ['product_id', 'product_qty', 'price_unit', 'price_total'])
-
             line = lines[0]
 
             product_data = Product.search_read([('id', '=', line['product_id'][0])], ['name'])
-        
+
             date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
-            date_approve = datetime.strptime(order['date_approve'], '%Y-%m-%d %H:%M:%S') if order['date_approve'] else date_order
-            
-            # Recupero della data di consegna effettiva da stock.picking
-            pickings = StockPicking.search_read(
-                [('origin', '=', order['name'])], 
-                ['date_done', 'scheduled_date']
-            )
+            date_planned = datetime.strptime(order['date_planned'], '%Y-%m-%d %H:%M:%S')
+            effective_date = datetime.strptime(order['effective_date'], '%Y-%m-%d %H:%M:%S') if order['effective_date'] else None
 
-
-            # Calcolo del tempo di consegna o del ritardo
-            if pickings:
-                date_done = pickings[0].get('date_done')
-                scheduled_date = pickings[0].get('scheduled_date')
-                
-                if date_done:
-                    # Se la consegna è stata effettuata
-                    date_done = datetime.strptime(date_done, '%Y-%m-%d %H:%M:%S')
-                    delivery_time = (date_done - date_order).days
-                elif scheduled_date:
-                    # Se non c'è data_done, calcolo del ritardo
-                    scheduled_date = datetime.strptime(scheduled_date, '%Y-%m-%d %H:%M:%S')
-                    delivery_time = (scheduled_date - date_order).days
+            # Calcolo del ritardo di consegna
+            if date_planned:
+                if effective_date is not None:
+                    delay = max((effective_date - date_planned).days, 0)  # Ritardo solo se > 0
                 else:
-                    # Se non ci sono date, impostiamo il ritardo come critico
-                    delivery_time = float('inf')  # Rappresenta un ritardo critico
+                    today = datetime.today()
+                    delay = max((today - date_planned).days, 0)
+            else:
+                delay = float('inf')  # Caso critico se manca la data prevista
+
+            # calcolo tempo medio di consegna
+            if date_planned:
+                if effective_date:
+                        delivery_time = (effective_date - date_order).days
+                else:
+                    today = datetime.today()
+                    delivery_time = (today - date_order).days
             else:
                 # Se non ci sono pickings, impostiamo il ritardo come critico
                 delivery_time = float('inf')
-
             # Aggiungi ai dati
             data.append({
                 'Fornitore': supplier_info['name'],
-                'Email Fornitore': supplier_info['email'],
                 'Prodotto': product_data[0]['name'],
                 'Quantità': line['product_qty'],
-                'Prezzo': line['price_unit'],
-                'Totale Ordine': line['price_total'],
-                'Data Ordine': date_order,
-                'Data Approvazione': date_approve,
-                'Data Done': date_done,
+                'Prezzo Totale': line['price_total'],
                 'Tempo di Consegna (giorni)': delivery_time,
+                'Ritardo di Consegna (giorni)': delay
             })
-    
+
+
     df = pd.DataFrame(data)
 
     # Calcolare le performance
     df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
-
+    
     # Calcolare performance aggregate per fornitore
     performance = df.groupby('Fornitore').agg({
-        'Totale Ordine': 'sum',
         'Tempo di Consegna (giorni)': 'mean',
         'Quantità': 'sum',
+        'Prezzo Totale': 'sum',
+        'Ritardo di Consegna (giorni)': 'mean'
     }).reset_index()
 
-    # Aggiungere l'indicatore di performance nella stessa colonna
-    def get_performance_indicator(days):
-        if days <= 0:
-            return f"Buono 🟢"
-        elif days <= 5:
-            return "Migliorabile 🟠"
-        else:
-            return "Critico 🔴"
-
-    performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)																  
+    performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)
 
     performance_markdown = performance.to_markdown(index=False)
     df_markdown = df.to_markdown(index=False)
+
+
     return df_markdown, performance
 
 
@@ -401,12 +270,11 @@ def get_supplier_performance_data():
 # Funzione per generare il report
 def generate_warehouse_report():
 
-    overview, _ = get_stock_overview()
     stock, _ = get_stock_report()
     stock_movement, _ = get_stock_movements()
-    supplier, _ = get_supplier_performance_data()
+    _, supplier = get_supplier_performance_data()
 
-    return overview, stock, stock_movement, supplier
+    return stock, stock_movement, supplier
 
 
 # Analisi del valore dello stock nel tempo
@@ -430,60 +298,100 @@ def plot_stock_trend():
     plt.show()
 
 
-
 def write_pdf(markdown_text, file_name):
-    # Converti il Markdown in HTML
     html_text = markdown(markdown_text)
-												 								 
-    # Ottieni la data e ora corrente
+    soup = BeautifulSoup(html_text, "html.parser")
+
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-	
     pdf_filename = f"{file_name}_{current_time}.pdf"
 
-    # Percorso corretto per salvare i PDF
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))  # Sale fino a challenge_aibot
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
     output_dir = os.path.join(base_dir, "static")
-    os.makedirs(output_dir, exist_ok=True)  # Crea la cartella se non esiste
+
+    os.makedirs(output_dir, exist_ok=True)
     pdf_path = os.path.join(output_dir, pdf_filename)
 
-    # Creazione del documento PDF
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    doc = SimpleDocTemplate(pdf_path, pagesize=landscape(letter), leftMargin=20, rightMargin=20)
     styles = getSampleStyleSheet()
     story = []
 
-    # Separiamo il testo in righe per individuare la tabella
-    lines = html_text.split("\n")
-    table_data = []
-    inside_table = False
+    def parse_markdown_table(text):
+        lines = text.strip().split('\n')
+        table_data = []
+        for line in lines:
+            if '|' in line and not line.startswith('|:'):  # Ignora la riga dei trattini
+                row = [col.strip() for col in line.split('|')[1:-1]]
+                if row:
+                    table_data.append(row)
+        return table_data
 
-    for line in lines:
-        if line.startswith("|"):  # Riconosce le righe della tabella Markdown
-            table_data.append(line.strip().split("|")[1:-1])  # Rimuove i bordi "|"
-            inside_table = True
-        elif inside_table:
-            break  # Fine della tabella
+    def parse_table(text):
+        table_data = parse_markdown_table(text)
 
-    if table_data:
-        # Applica uno stile alla tabella
-        table = Table(table_data)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),  # Intestazione grigia
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
-            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-        ]))
-        story.append(table)
-        story.append(Spacer(1, 12))
+        if table_data:
+            col_widths = [80] * len(table_data[0])
+            table = Table(table_data, repeatRows=1, colWidths=col_widths, hAlign='CENTER')
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                ("WORDWRAP", (0, 0), (-1, -1), 'CJK'),  # Wrapping per testo lungo
+            ]))
 
-    # Aggiunge il resto del testo che non è nella tabella
-    for line in lines:
-        if not line.startswith("|"):  # Evita di aggiungere due volte le righe della tabella
-            story.append(Paragraph(line, styles["Normal"]))
+            for i, row in enumerate(table_data[1:], start=1):
+                if len(row) >= 7:
+                    stato = row[6]
+                    color = colors.black
+                    if '🔴' in stato:
+                        color = colors.red
+                    elif '🟠' in stato:
+                        color = colors.orange
+                    elif '🟢' in stato:
+                        color = colors.green
+                    table.setStyle([("TEXTCOLOR", (6, i), (6, i), color)])
+
+            story.append(table)
             story.append(Spacer(1, 12))
 
-    # Creazione del PDF
+    def parse_list(element):
+        items = [li.get_text(strip=True) for li in element.find_all("li")]
+        if items:
+            for item in items:
+                if '🔴' in item:
+                    story.append(Paragraph(f'<font color="red">• {item}</font>', styles["Normal"]))
+                elif '🟠' in item:
+                    story.append(Paragraph(f'<font color="orange">• {item}</font>', styles["Normal"]))
+                elif '🟢' in item:
+                    story.append(Paragraph(f'<font color="green">• {item}</font>', styles["Normal"]))
+                else:
+                    story.append(Paragraph(f"• {item}", styles["Normal"]))
+            story.append(Spacer(1, 12))
+
+    table_pattern = re.compile(r'(\|.*\|\n)+')
+
+    for element in soup.find_all(["h1", "h2", "h3", "p", "ul", "li"]):
+        text = element.get_text(strip=True)
+
+        if element.name == "p" and table_pattern.search(text):
+            parse_table(text)
+
+        elif element.name == "ul":
+            parse_list(element)
+
+        else:
+            if element.name == "h1":
+                story.append(Paragraph(text, styles["Title"]))
+            elif element.name == "h2":
+                story.append(Paragraph(text, styles["Heading1"]))
+            elif element.name == "h3":
+                story.append(Paragraph(text, styles["Heading2"]))
+            else:
+                story.append(Paragraph(text, styles["Normal"]))
+            story.append(Spacer(1, 12))
+
     doc.build(story)
     print(f"✅ PDF creato: {pdf_path}")

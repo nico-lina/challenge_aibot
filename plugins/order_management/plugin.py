@@ -81,7 +81,6 @@ class OrderLine(BaseModel):
     @classmethod
     def validate_product_name(cls, v):
         product_data = get_product_by_name(v)
-        print("PRODUCT DATA", product_data)
         if not product_data:
             raise ValueError(f"Errore: Il prodotto '{v}' non esiste. Inserisci un nome valido.")
         if "multiple_matches" in product_data:
@@ -135,7 +134,8 @@ class OrderForm(SuperCatForm):
             name= self.cat.llm(nome_ordine),
             currency_id=currency  # Imposta l'ID della valuta corretta se necessario
         )
-        prompt = (f"Scrivi che l'ordine è stato creato correttamente e scrivi in maniera riassuntiva i dettagli dell'ordine:\n{result}")
+        prompt = (f"Scrivi che l'ordine è stato creato correttamente e scrivi in maniera riassuntiva i dettagli dell'ordine:\n{result}"
+                "Rispondi con una risposta diretta senza aggiungere commenti tuoi")
         return {"output": f"{self.cat.llm(prompt)}"}
 
     def message_wait_confirm(self):
@@ -143,6 +143,7 @@ class OrderForm(SuperCatForm):
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso creare l'ordine nel sistema? Rispondi dicendo Si puoi inserirlo'"
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
         )
 
         print(self._state)
@@ -154,12 +155,14 @@ class OrderForm(SuperCatForm):
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
             form di creazione dell'ordine."""
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
         )
         return {"output": f"{self.cat.llm(prompt)}"}
 
     def message_closed(self):
         prompt = (
-            f"L'utente non vuole più creare l'ordine, scrivigli che stai uscendo dal form"
+            f"L'utente non vuole più creare l'ordine, scrivigli che stai uscendo dal form di creazione dell'ordine"
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
         )
 
         return {"output": f"{self.cat.llm(prompt)}"}
@@ -190,9 +193,10 @@ def complete_orders_tool(tool_input, cat):
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente i risultati della chiusura degli ordini. 
         Che sono contenuti in questo elenco. 
-        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
 
         {result}
+        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
+
         """, stream=True)
     
     return output.replace("**", "")
@@ -228,9 +232,9 @@ def delete_order_tool(tool_input, cat):
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente i risultati delle cancellazioni degli ordini. 
         Che sono contenuti in questo elenco. 
-        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
 
         {result}
+        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
         """, stream=True)
     
     return output.replace("**", "")

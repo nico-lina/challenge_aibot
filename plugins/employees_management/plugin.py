@@ -87,6 +87,7 @@ class EmployeeForm(SuperCatForm):
 
         prompt = f"""Scrivi che il dipendente è stato creato con successo. scrivi i seguenti dettagli in maniera chiara per l'utente:
         {result}
+        "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
         """
         
         return {"output":f"{self.cat.llm(prompt, stream=True)}"}
@@ -96,6 +97,7 @@ class EmployeeForm(SuperCatForm):
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Rispondi dicendo Si puoi inserirlo'"
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"        
         )
 
         return {"output": f"{self.cat.llm(prompt)}"}
@@ -111,6 +113,7 @@ class EmployeeForm(SuperCatForm):
             Per aiutare l'utente dai queste informazioni sugli id dei job e dei calendari.
             id dei job: {job_names}
             id dei calendari: {department_names}
+            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
             """
         )
         return {"output": f"{self.cat.llm(prompt)}"}
@@ -118,6 +121,7 @@ class EmployeeForm(SuperCatForm):
     def message_closed(self): 
         prompt = (
             f""" L'utente non vuole più inserire un nuovo dipendente, rispondi che va bene e chiedi se ha bisogno di altro
+                "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
             """
         )
         return {"output": f"{self.cat.llm(prompt)}"}
