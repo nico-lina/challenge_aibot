@@ -143,7 +143,7 @@ class OrderForm(SuperCatForm):
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso creare l'ordine nel sistema? Rispondi dicendo Si puoi inserirlo'"
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta ma riassuntiva senza aggiungere commenti tuoi"
         )
 
         print(self._state)
@@ -155,7 +155,7 @@ class OrderForm(SuperCatForm):
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
             form di creazione dell'ordine."""
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta ma riassuntiva senza aggiungere commenti tuoi"
         )
         return {"output": f"{self.cat.llm(prompt)}"}
 

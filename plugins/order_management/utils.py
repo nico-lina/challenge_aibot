@@ -247,10 +247,9 @@ def complete_order(order_id):
                 'product_id': product.id,
                 'location_id': location_dest_id,
                 'quantity': product_uom_qty,
-                'lot_id': lot  # ✅ Lotto associato correttamente
+                'lot_id': lot 
             })
 
-        # 🔹 CREAZIONE DEL MOVIMENTO DI MAGAZZINO
         StockMove.create({
             'product_id': product.id,
             'location_id': location_id,
@@ -261,7 +260,6 @@ def complete_order(order_id):
             'name': f"Ordine {product.id}", 
         })
         
-    # 🔹 SEGNA L'ORDINE COME COMPLETATO
     order.write({
         'state': 'purchase',
         'effective_date': current_date

@@ -145,18 +145,12 @@ vecchi fornitori inseriti.
     start_examples = [
         "Voglio inserire un nuovo fornitore",
         "Voglio inserire un fornitore",
-        "Aiutami ad inserire un fornitore",
-        "Aiutami ad inserire un nuovo fornitore",
-        "Aggiungiamo un nuovo fornitore",
-        "Aggiungiamo un fornitore",
     ]
     stop_examples = [
         "Non voglio più inserire il fornitore",
         "Non voglio più inserire il nuovo fornitore",
         "Ho finito con l'aggiunta di un nuovo fornitore",
         "Ho finito con l'inserimento di un nuovo fornitore",
-        "Sì",
-        "Sì puoi inserirlo",
     ]
 
     ask_confirm = True
