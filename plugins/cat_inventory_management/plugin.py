@@ -28,7 +28,7 @@ def get_the_warehouse_status(tool_input, cat):
     mark, _ = get_warehouse()
 
     output = cat.llm(
-        f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione adeguata e senza usare tabelle, i dati contenuti in questa tabella:
+        f"""Mostra i dati:
         
         {mark}
         
@@ -36,7 +36,7 @@ def get_the_warehouse_status(tool_input, cat):
         """,
         stream=True,
     )
-    output = output.replace("**", "")
+    # output = output.replace("**", "")
 
     return output
 
@@ -107,7 +107,7 @@ def send_mail_to_wh_manager(tool_input, cat):
         .replace("```", "")
     )
 
-    send_mail(mail_text, "Notifica Riordino Prodotti")
+    # send_mail(mail_text, "Notifica Riordino Prodotti")
     telegram_text = (
         cat.llm(f"""Prepara il testo di un messaggio telegram che dica al responsabile di ordinare
                         i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. Formatta la tabella con il tag <code>.
@@ -173,9 +173,7 @@ vecchi fornitori inseriti.
         supplier_name = form_data["supplier_name"]
 
         if result:
-            return {
-                "output": f'Ho creato il fornitore <a href="{link}" target="_blank"> {supplier_name}</a> -{self._state}'
-            }
+            return {"output": f"Ho creato il fornitore [{supplier_name}]({link})"}
         else:
             return {"output": "Non ho potuto creare il fornitore"}
 
@@ -193,8 +191,8 @@ vecchi fornitori inseriti.
         prompt = (
             f"Nel form mancano alcuni dettagli:\n{self._generate_base_message()}\n"
             """In base a ciò che è ancora necessario,
-            crea un suggerimento per aiutare l'utente a compilare il
-            form di inserimento del fornitore"""
+            invia un messaggio per aiutare l'utente a compilare il
+            form di inserimento del fornitore. Non inserire i parametri tipo supplier_name e non inserire commenti."""
         )
         return {"output": f"{self.cat.llm(prompt)}"}
 
