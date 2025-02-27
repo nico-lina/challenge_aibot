@@ -28,49 +28,67 @@ def generate_report(tool_input, cat):
 
     # **Titolo: Report Generale del Magazzino**
 
-    ## 1. **Introduzione:**
+    ## **1. Introduzione:**
     - Fornisci una panoramica generale dello stato attuale del magazzino, evidenziando livelli di stock, movimenti recenti e performance dei fornitori.
     - Specifica che l’obiettivo è monitorare i livelli di stock, tracciare entrate/uscite e valutare l’efficienza dei fornitori.
     - Indica la periodicità del report (ad esempio, mensile, settimanale, ecc.).
 
-    ---    
+    ---
 
-    ## 2. **Livelli di Stock:**
-    - Analizza le informazioni di ogni prodotto con i seguenti dettagli:
-    - Nome Prodotto, Codice Prodotto, Categoria
-    - Quantità Disponibile, Soglia Minima, Threshold (20% della soglia minima)
+    ## **2. Livelli di Stock:**
+    Analizza e organizza le informazioni di ogni prodotto nel magazzino con dettagli utili, identifica prodotti con basso stock o a rischio esaurimento.
+    - Nome Prodotto, Codice Prodotto
+    - Quantità
     - Stato (🟢 OK, 🟠 Attenzione, 🔴 Critico)
-    - Valore Unitario (€), Valore Totale (€)
-    - Top 5 Prodotti per Disponibilità
-    - Top 5 Prodotti per Valore (€)
+    - Prezzo Unitario (€), Prezzo Totale (€)
 
     Dati disponibili:
     {stock_data}
 
+    Fai una sintesi delle principali osservazioni emerse dal report.
+    Indicazioni su eventuali azioni da intraprendere, come l'adeguamento dei livelli di stock o il riordino di prodotti con scorte basse.
+    Commento finale sullo stato dei livelli di stock del magazzino e suggerimenti per miglioramenti.
+    Indica che il threshold è stato impostato al 20% della soglia minima, e spiega come sono indicati i tre livelli di stato.
+
     ---
 
-    ## 3. **Movimenti di Magazzino (Entrate/Uscite):**
-    - Mostra i movimenti recenti, inclusi:
-    - Nome Prodotto, Codice Prodotto, Categoria
+    ## **3. Movimenti di Magazzino (Entrate/Uscite):**
+    Fornire una breve panoramica dello stato attuale del magazzino.
+    Descrivere gli obiettivi principali del report, come l'analisi dei movimenti recenti.
+    Fare un cenno alla periodicità del report (ad esempio, mensile, settimanale, ecc.).
+    - Nome Prodotto, Codice Prodotto
     - Data Movimento (formato leggibile), Tipo Movimento (🟢 Entrata, 🔴 Uscita)
     - Quantità, Fornitore, Indirizzo, Email (se sconosciuto, testo in corsivo grigio chiaro)
 
     Dati disponibili:
     {stock_movement}
 
+    Sintesi delle principali osservazioni emerse dal report.
+    Indicazioni su eventuali azioni da intraprendere.
+    Analisi sui movimenti in entrata e su quelli in uscita.
+    Commento finale sullo stato generale del magazzino e suggerimenti per miglioramenti.
+
     ---
 
-    ## 4. **Performance dei Fornitori:**
-    - Analizza i seguenti indicatori per ogni fornitore:
-    - Nome Fornitore, Tempo di Consegna Medio, Quantità Totale, Prezzo Totale (€)
-    - Ritardo Medio di Consegna, Performance (🟢 Buono, 🟠 Migliorabile, 🔴 Critico)
+    ## **4. Performance dei Fornitori:**
+    Fornire una panoramica generale delle performance dei fornitori per i prodotti in magazzino.
+    Descrivere gli obiettivi principali del report, come l'analisi dei tempi di consegna, dei costi e dell'affidabilità.
+    Analizza i seguenti indicatori per ogni fornitore:
+    - Nome Fornitore, Quantità Totale, Prezzo Totale (€)
+    - Tempo di Consegna, Ritardo di Consegna, Performance (🟢 Buono, 🟠 Migliorabile, 🔴 Critico)
 
     Dati disponibili:
     {supplier_performance_data}
 
+    Specifica che il Tempo Medio di Consegna e il Ritardo Medio di Consegna sono espressi in numero di giorni.
+    Sintesi delle principali osservazioni emerse dal report.
+    Identificare i fornitori con il miglior tempo di consegna e la minor percentuale di ritardi
+    Evidenziazione dei fornitori più performanti, con suggerimenti per miglioramenti.
+    Raccomandazioni per ottimizzare il processo di approvvigionamento.
+
     ---
 
-    ## 5. **Conclusione:**
+    ## **5. Conclusione:**
     Sintetizza le principali osservazioni:
     - Livelli di stock: evidenzia prodotti critici o a rischio esaurimento.
     - Movimenti: commenta su eventuali variazioni anomale nelle entrate/uscite.
@@ -138,13 +156,10 @@ def generate_stock_report(tool_input, cat):
     Dati da includere:
     - Nome Prodotto
     - Codice Prodotto
-    - Categoria
-    - Quantità Disponibile
-    - Soglia Minima
-    - Threshold
+    - Quantità
     - Stato (🟢 OK, 🟠 Attenzione, 🔴 Critico)
-    - Valore Unitario (€)
-    - Valore Totale (€)
+    - Prezzo Unitario (€)
+    - Prezzo Totale (€)
 
     3. **Conclusione:**
     Sintesi delle principali osservazioni emerse dal report.
@@ -208,7 +223,6 @@ def generate_report_stock_movements(tool_input, cat):
     Titolo: Report Movimenti del Magazzino
 
     1. **Introduzione:**
-
     Fornire una breve panoramica dello stato attuale del magazzino.
     Descrivere gli obiettivi principali del report, come l'analisi dei movimenti recenti.
     Fare un cenno alla periodicità del report (ad esempio, mensile, settimanale, ecc.).
@@ -218,7 +232,6 @@ def generate_report_stock_movements(tool_input, cat):
     Dati da includere:
     - Nome del Prodotto
     - Codice del Prodotto
-    - Categoria del Prodotto
     - Data Movimento (usa un formato leggibile)
     - Tipo Movimento (🟢 Entrata, 🔴 Uscita)
     - Quantità
@@ -293,11 +306,13 @@ def generate_supplier_performance_report(tool_input, cat):
     2. **Analisi delle Performance dei Fornitori:**
     Analizzare i dati relativi a ciascun fornitore, includendo le seguenti informazioni:
     - Fornitore
-    - Tempo di Consegna: il tempo medio tra la data prevista di consegna dell'ordine e la data effettiva di ricezione
     - Quantità Totale: quantità totale acquistata per ogni fornitore
     - Prezzo Totale: il totale dei prezzi degli ordini effettuati a ciascun fornitore
+    - Tempo di Consegna: il tempo medio tra la data prevista di consegna dell'ordine e la data effettiva di ricezione
     - Ritardo di Consegna: il ritardo medio tra la data dell'ordine e la data di consegna per ogni fornitore
     - Performance: indicatore di performance del fornitore (🟢 Buono, 🟠 Migliorabile, 🔴 Critico)
+
+    Specifica che il Tempo di Consegna e il Ritardo di Consegna sono espressi in numero di giorni.
 
     3. **Conclusione:**
     Sintesi delle principali osservazioni emerse dal report.
@@ -337,9 +352,6 @@ def generate_supplier_performance_report(tool_input, cat):
 
 
 
-
-
-
 @tool(
     return_direct=True,
     examples=[
@@ -352,16 +364,16 @@ def generate_stock_chart(tool_input, cat):
     """ Genera un grafico a barre con i livelli di stock disponibili nel magazzino """
 
     # Ottieni i dati dal magazzino
-    stock_data = get_warehouse_data()
+    stock_data, _ = get_stock_report()
 
     print(type(stock_data))
 
     print('-------- PRODOTTI --------')
-    prodotti = stock_data['Prodotto']
+    prodotti = stock_data['Nome Prodotto']
     print(prodotti)
 
     print('-------- QUANTITA DISPONIBILI --------')
-    quantità_disponibili = stock_data["Quantità Disponibile"]
+    quantità_disponibili = stock_data["Quantità"]
     print(quantità_disponibili)
 
     # Creazione del grafico a barre
@@ -377,6 +389,6 @@ def generate_stock_chart(tool_input, cat):
 
     filename = "stock_magazzino.png"
     plt.savefig(filename)
-    plt.close()
+    # plt.close()
     
-    return filename
+    return plt
