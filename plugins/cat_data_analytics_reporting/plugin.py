@@ -22,6 +22,7 @@ def generate_report(tool_input, cat):
     # Ottieni i dati dal magazzino
     stock_data, stock_movement, supplier_performance_data = generate_warehouse_report()
 
+    
     # Prepara il prompt per il modello LLM
     prompt = f"""
     Genera un report dettagliato e unificato in tempo reale che copra i seguenti aspetti:
@@ -88,15 +89,17 @@ def generate_report(tool_input, cat):
     - Rosso: "Critico" e "Uscita"
     - **Tipografia:** Usa grassetto e diverse dimensioni di testo per migliorare la leggibilità.
     - **Stile:** Formale ma chiaro e conciso, con una struttura visiva ordinata per facilitare la comprensione immediata delle informazioni.
-    """
 
+        Se non hai dati non inventarterli, ma scrivi che non hai generato il report perchè i dati non sono presenti
+    """
+    #Aggiunta ultima riga che impone di non inventare dati
     # Richiesta al modello LLM
     output = cat.llm(
         prompt,
         stream=True,
     )
-
-    write_pdf(output, "report_magazzino")
+    if stock_data and stock_movement and supplier_performance_data:
+        write_pdf(output, "report_magazzino")
 
     return output
 
@@ -169,6 +172,7 @@ def generate_stock_report(tool_input, cat):
     Rosso per "Critico" e "Uscita"
     Stile: Il report deve avere uno stile formale, ma chiaro e conciso, con una buona organizzazione visiva e testuale per facilitare la comprensione immediata delle informazioni.
 
+    Se non hai dati non inventarterli, ma scrivi che non hai generato il report perchè i dati non sono presenti
     """
 
     # Richiesta al modello LLM
@@ -176,8 +180,8 @@ def generate_stock_report(tool_input, cat):
         prompt,
         stream=True,
     )
-    
-    write_pdf(output, "report_livelli_stock")
+    if stock_data:
+        write_pdf(output, "report_livelli_stock")
 
     return output
 
@@ -249,6 +253,7 @@ def generate_report_stock_movements(tool_input, cat):
     Rosso per "Critico" e "Uscita"
     Stile: Il report deve avere uno stile formale, ma chiaro e conciso, con una buona organizzazione visiva e testuale per facilitare la comprensione immediata delle informazioni.
 
+    Se non hai dati non inventarterli, ma scrivi che non hai generato il report perchè i dati non sono presenti
     """
 
     # Richiesta al modello LLM
@@ -256,8 +261,8 @@ def generate_report_stock_movements(tool_input, cat):
         prompt,
         stream=True,
     )
-
-    write_pdf(output, "report_movimenti_magazzino")
+    if stock_movement:
+        write_pdf(output, "report_movimenti_magazzino")
 
     return output
 
@@ -278,7 +283,7 @@ def generate_supplier_performance_report(tool_input, cat):
     """ Genera un report dettagliato sulle performance dei fornitori, analizzando tempi di consegna, costi e affidabilità """
 
     # Ottieni i dati sui fornitori e sui prodotti in magazzino
-    supplier_performance_data, _ = get_supplier_performance_data()
+    _,supplier_performance_data = get_supplier_performance_data()
 
     # Prepara il prompt per il modello LLM
     prompt = f"""
@@ -322,6 +327,7 @@ def generate_supplier_performance_report(tool_input, cat):
     Rosso per "Critico" e "Uscita"
     Stile: Il report deve avere uno stile formale, ma chiaro e conciso, con una buona organizzazione visiva e testuale per facilitare la comprensione immediata delle informazioni.
 
+    Se non hai dati non inventarterli, ma scrivi che non hai generato il report perchè i dati non sono presenti
     """
 
     # Richiesta al modello LLM
@@ -330,7 +336,9 @@ def generate_supplier_performance_report(tool_input, cat):
         stream=True,
     )
 
-    write_pdf(output, "report_performance_fornitori")
+    print("SUPPLIER: ", supplier_performance_data)
+    if supplier_performance_data != "":
+        write_pdf(output, "report_performance_fornitori")
 
     return output
 

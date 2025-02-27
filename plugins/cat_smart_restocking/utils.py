@@ -17,9 +17,9 @@ def connect(db):
     try:
         params = {
             'host': 'host.docker.internal',
-            'database': 'db_test',
-            'user': 'prova@prova',
-            'password': 'password',
+            'database': 'db_final',
+            'user': 'admin',
+            'password': 'admin',
             'port': '5433'
         }
         return psql.connect(**params)
@@ -30,7 +30,7 @@ def connect(db):
 def get_odoo_connection():
     """ Connette a Odoo """
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
-    odoo.login('db_test', 'prova@prova', 'password')
+    odoo.login('health_final', 'admin', 'admin')
     return odoo
 
 def get_product_by_name(product_name):
@@ -48,7 +48,7 @@ def get_product_by_name(product_name):
 
     # Ricerca fuzzy per trovare i prodotti simili
     matches = process.extract(product_name, product_names, scorer=fuzz.ratio, limit=10)  # Prendiamo fino a 10 migliori risultati
-    # print("MATCHES: ", matches)
+    print("MATCHES: ", matches)
     # Controlla se esiste un match con score >= 90
     best_match = next((match[0] for match in matches if match[1] >= 80), None)
     
@@ -59,7 +59,8 @@ def get_product_by_name(product_name):
             "id": matched_product["id"],
             "name": matched_product["name"]
         }
-    
+    else: 
+        return None
     # Se nessun match supera 90, filtra quelli con score > 50
     valid_matches = [match[0] for match in matches if match[1] > 45]
 
@@ -83,8 +84,12 @@ def predict_future_demand(id, months: int):
     
     product_id = get_product_by_name(id)
 
-    quantity = PurchaseLine.search_read([('product_id', '=', product_id['id'])], ['date_planned', 'name', 'product_qty'])
-
+    if product_id is None:
+        return "null"
+    try:
+        quantity = PurchaseLine.search_read([('product_id', '=', product_id['id'])], ['date_planned', 'name', 'product_qty'])
+    except Exception as e:
+        return f"Errore (Dettaglio: {e})"
     df = pd.DataFrame(quantity)
     df["order_date"] = pd.to_datetime(df["date_planned"])
     
@@ -127,13 +132,17 @@ def suggest_reorder_date(name, months_ahead=3):
     odoo = get_odoo_connection()
     StockWarehouse = odoo.env['stock.warehouse.orderpoint']
     PurchaseLine = odoo.env['purchase.order.line']
-
+    print("name", name)
     id = get_product_by_name(name)
-
-    # Recupero dati di stock e ordini
-    stock_data = StockWarehouse.search_read([('product_id', '=', id['id'])], ['product_id', 'product_min_qty', 'product_max_qty'])
-    order_data = PurchaseLine.search_read([('product_id', '=', id['id'])], ['product_id', 'name', 'product_qty', 'date_planned'])
-
+    print("ID",id)
+    if id is None:
+        return "null"
+    try:
+        # Recupero dati di stock e ordini
+        stock_data = StockWarehouse.search_read([('product_id', '=', id['id'])], ['product_id', 'product_min_qty', 'product_max_qty'])
+        order_data = PurchaseLine.search_read([('product_id', '=', id['id'])], ['product_id', 'name', 'product_qty', 'date_planned'])
+    except Exception as e:
+        return f"Errore (dettaglio: {e})"
     stock_df = pd.DataFrame(stock_data)
     order_df = pd.DataFrame(order_data)
 

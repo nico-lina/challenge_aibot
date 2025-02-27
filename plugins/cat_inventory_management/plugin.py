@@ -56,7 +56,7 @@ def create_new_product(tool_input, cat):
     - Il terzo valore è un numero intero o decimale che indica la quantità minima per il riordino.
     - Il quarto valore è il prezzo unitario del prodotto
 
-    """
+    """ 
 
     product_name, product_qty, product_min_qty, product_price = tool_input.split(",")
 
@@ -179,7 +179,7 @@ vecchi fornitori inseriti.
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il fornitore nel sistema? Rispondi dicendo Si puoi inserirlo'"
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta che contenga il riassunto dei dati inseriti senza aggiungere commenti tuoi"
         )
 
         return {"output": f"{self.cat.llm(prompt)}"}

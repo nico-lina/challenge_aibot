@@ -19,9 +19,9 @@ from bs4 import BeautifulSoup
 
 # Connessione a Odoo
 def connect_to_odoo():
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'    
+    db = 'health_final'
+    username = 'admin'
+    password = 'admin'    
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
     odoo.login(db, username, password)
     return odoo
@@ -194,14 +194,14 @@ def get_supplier_performance_data():
     purchase_orders = Purchase.search_read([('state', 'in', ['done', 'purchase'])], ['name', 'partner_id', 'order_line', 'effective_date', 'date_planned', 'date_order'])
 
     data = []
-
+    print("PURCHASE ORDER: ",purchase_orders)
     for order in purchase_orders:
-
+        print("ORDER", order)
         # Ottenere i dettagli del fornitore
         supplier_id = order['partner_id'][0]
         supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
         supplier_info = supplier_data[0]
-
+        print("SUPPLIER INFO:", supplier_info)
     
         for line_id in order['order_line']:
             lines = OrderLine.search_read([('id', '=', line_id)], ['product_id', 'product_qty', 'price_unit', 'price_total'])
@@ -212,7 +212,9 @@ def get_supplier_performance_data():
             date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
             date_planned = datetime.strptime(order['date_planned'], '%Y-%m-%d %H:%M:%S')
             effective_date = datetime.strptime(order['effective_date'], '%Y-%m-%d %H:%M:%S') if order['effective_date'] else None
-
+            print("DATE ORDER: ", date_order)
+            print("DATE PLANNED: ", date_planned)
+            print ("EFFECTIVE DATE", effective_date)
             # Calcolo del ritardo di consegna
             if date_planned:
                 if effective_date is not None:
@@ -245,7 +247,9 @@ def get_supplier_performance_data():
 
 
     df = pd.DataFrame(data)
-
+    #Aggiunta gestione db vuoto
+    if df.empty : 
+        return "null", df
     # Calcolare le performance
     df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
     
@@ -263,7 +267,7 @@ def get_supplier_performance_data():
     df_markdown = df.to_markdown(index=False)
 
 
-    return df_markdown, performance
+    return df_markdown, performance_markdown
 
 
 

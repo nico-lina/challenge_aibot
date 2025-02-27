@@ -8,16 +8,18 @@ import random
 def get_orders():
     """Recupera gli ordini da Odoo e restituisce una tabella formattata."""
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
     
     PurchaseOrder = odoo.env['purchase.order']
     orders = PurchaseOrder.search_read([], ['id', 'name', 'state'])
     
     df = pd.DataFrame(orders)
-    
+    if df.empty:
+        return "null"
     state_mapping = {
         'draft': 'Bozza',
         'sent': 'Inviato',
@@ -35,10 +37,10 @@ def get_orders():
 def get_partner_id_by_name(partner_name):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     Partner = odoo.env['res.partner']
@@ -49,10 +51,10 @@ def get_partner_id_by_name(partner_name):
 def get_product_by_name(product_name):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     Product = odoo.env['product.product']
@@ -100,10 +102,10 @@ def get_product_by_name(product_name):
 def generate_order(partner_id, order_lines, name, currency_id, company_id=1, user_id=2):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     # Modelli Odoo
@@ -179,16 +181,13 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
     return result
 
 
-
-#TODO creare campo expiration date e impostarlo, poi utilizzarlo per filtrare come parte della chiave primaria in stock quant
-#TODO campi da usare date_order, date_approve, date_planned -> creo l'ordine, effective_date -> quando confermo
 def complete_order(order_id):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
     
     PurchaseOrder = odoo.env['purchase.order']
@@ -196,12 +195,10 @@ def complete_order(order_id):
     StockMove = odoo.env['stock.move']
     StockProductionLot = odoo.env['stock.lot']  # Tabella per i lotti
     
-    random_days = random.randint(90, 360)
+    random_days = random.randint(90, 1100)
     expiration_date = (datetime.now() + timedelta(days=random_days)).replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
     current_date = datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
     
-    print("EXP DATE:", expiration_date)
-    print("CURRENT_DATE:", current_date)
 
     order = PurchaseOrder.browse(order_id)
     if not order.exists():
@@ -217,7 +214,6 @@ def complete_order(order_id):
         partner_id = order.partner_id.id
         product_uom_qty = line.product_qty
         
-        # 🔹 CREAZIONE O RECUPERO DEL LOTTO
         lot = StockProductionLot.search([
             ('product_id', '=', product.id),
             ('expiration_date', '=', expiration_date)
@@ -231,8 +227,7 @@ def complete_order(order_id):
             })
         else:
             lot = StockProductionLot.browse(lot[0])
-        print("LOT: ", lot)
-        # 🔹 CREAZIONE O AGGIORNAMENTO DI StockQuant CON IL LOTTO
+       
         quant = StockQuant.search([
             ('product_id', '=', product.id), 
             ('location_id', '=', location_dest_id), 
@@ -272,10 +267,10 @@ def complete_order(order_id):
 def delete_order(order_id):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
     
     PurchaseOrder = odoo.env['purchase.order']
@@ -302,10 +297,10 @@ def delete_order(order_id):
 def auto_order():
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
 
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'        
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
    # Modelli Odoo
@@ -347,10 +342,10 @@ def auto_order():
 def get_order_details(order_id):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     # Modello Odoo
@@ -358,9 +353,10 @@ def get_order_details(order_id):
     PurchaseOrderLine = odoo.env['purchase.order.line']
     
     # Recupero ordine
-    order = PurchaseOrder.browse(order_id)
-    if not order:
-        return {"error": "Ordine non trovato"}
+    try:
+        order = PurchaseOrder.browse(order_id)
+    except Exception as e:
+        return f"Errore nel recupero dell'ordine (Dettaglio: {e})"
     
     # Recupero linee d'ordine
     order_lines_data = []

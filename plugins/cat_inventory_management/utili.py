@@ -36,28 +36,26 @@ def connect(db):
     #         print('Database connection closed.')
 
 
+
 def get_warehouse():
-    odoo = odoorpc.ODOO(
-        "host.docker.internal", port=8069
-    )  # Cambia host e porta se necessario
+    odoo = odoorpc.ODOO("host.docker.internal", port=8069)  # Cambia host e porta se necessario
 
     # Autenticazione
-    db = "db_test"
-    username = "prova@prova"
-    password = "password"
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     # Modelli Odoo
     Product = odoo.env["product.product"]
     StockQuant = odoo.env["stock.quant"]
-    StockLocation = odoo.env["stock.location"]
     OrderPoint = odoo.env["stock.warehouse.orderpoint"]
 
     # Recupero prodotti con quantità disponibili a magazzino
     products = Product.search_read([], ["id", "name"])
 
-    # Lista per raccogliere i dati
-    data = []
+    # Dizionario per raccogliere i dati aggregati
+    product_data = {}
 
     for product in products:
         product_id = product["id"]
@@ -66,37 +64,33 @@ def get_warehouse():
         # Ottieni le quantità per il prodotto
         quants = StockQuant.search_read(
             [("product_id", "=", product_id)],
-            ["location_id", "quantity", "reserved_quantity"],
+            ["quantity", "reserved_quantity"],
         )
         orderpoint = OrderPoint.search_read(
             [("product_id", "=", product_id)], ["product_min_qty"]
         )
-        min_qty = (
-            orderpoint[0]["product_min_qty"] if orderpoint else 0
-        )  # Default a 0 se non è impostata
+        min_qty = orderpoint[0]["product_min_qty"] if orderpoint else 0  # Default a 0 se non impostata
 
+        # Inizializza il prodotto nel dizionario se non esiste
+        if product_id not in product_data:
+            product_data[product_id] = {
+                "Prodotto": product_name,
+                "Quantità Disponibile": 0,
+                "Quantità Riservata": 0,
+                "Quantità Minima di Riordino": min_qty,
+            }
+
+        # Somma le quantità per lo stesso prodotto
         for quant in quants:
-            location_id = quant["location_id"][0]
-
-            # Ottieni il nome del magazzino dalla location
-            location_data = StockLocation.browse(location_id)
-            warehouse_name = (
-                location_data.display_name if location_data else "Sconosciuto"
-            )
-
-            # Aggiungi i dati alla lista
-            data.append(
-                {
-                    "Prodotto": product_name,
-                    # 'Magazzino': warehouse_name,
-                    "Quantità Disponibile": quant["quantity"],
-                    "Quantità Riservata": quant["reserved_quantity"],
-                    "Quantità Minima di Riordino": min_qty,
-                }
-            )
+            product_data[product_id]["Quantità Disponibile"] += quant["quantity"]
+            product_data[product_id]["Quantità Riservata"] += quant["reserved_quantity"]
 
     # Creazione DataFrame
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(product_data.values())
+
+    if df.empty:
+        return "Nessun prodotto disponibile in magazzino", df
+    
     df = df[df["Quantità Disponibile"] >= 0]
 
     # Stampa il DataFrame
@@ -109,9 +103,9 @@ def create_product(product_name, product_qty, product_min_qty, product_descripti
     odoo = odoorpc.ODOO("host.docker.internal", port=8069)
 
     # Autenticazione
-    db = "db_test"
-    username = "prova@prova"
-    password = "password"
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     Product = odoo.env["product.product"]
@@ -199,10 +193,10 @@ def create_supplier(
 ):
     odoo = odoorpc.ODOO("host.docker.internal", port=8069)
 
-    # Autenticazione
-    db = "db_test"
-    username = "prova@prova"
-    password = "password"
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     Partner = odoo.env["res.partner"]
@@ -238,10 +232,10 @@ def create_customer(
 ):
     odoo = odoorpc.ODOO("host.docker.internal", port=8069)
 
-    # Autenticazione
-    db = "db_test"
-    username = "prova@prova"
-    password = "password"
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     Partner = odoo.env["res.partner"]

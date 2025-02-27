@@ -16,9 +16,10 @@ def get_expiration_dates():
         "host.docker.internal", port=8069
     )  # Cambia host e porta se necessario
 
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     # Modelli Odoo
@@ -54,6 +55,8 @@ def get_expiration_dates():
 
     # Creazione DataFrame
     df = pd.DataFrame(data)
+    if df.empty:
+        return "null", "null"
     df = df[df["Quantità Disponibile"] >= 0]
     df["Data di Scadenza"] = pd.to_datetime(df["Data di Scadenza"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
     df = df.dropna(subset=["Data di Scadenza"])
@@ -68,7 +71,6 @@ def get_expiration_dates():
     )
 
     # Stampa il DataFrame
-    print(df)
     mark = df.to_markdown(index=False)
 
     return mark, df
@@ -81,11 +83,11 @@ def get_expiring_products(days_to_expire):
     )  # Cambia host e porta se necessario
 
     # Autenticazione
-    db = "db_test"
-    username = "prova@prova"
-    password = "password"
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
-
+    
     days_to_expire = int(days_to_expire)
 
     # Modelli Odoo
@@ -145,7 +147,8 @@ def get_expiring_products(days_to_expire):
 
     # Creazione DataFrame
     df = pd.DataFrame(data)
-    
+    if df.empty:
+        return "null", "null"
     # Verifica che la colonna "Quantità Disponibile" esista prima di filtrare
     if "Quantità Disponibile" in df.columns:
         df = df[df["Quantità Disponibile"] > 0]

@@ -156,36 +156,38 @@ def get_job_names_tool(tool_input, cat):
 def complete_employee_tool(tool_input, cat):
     """Completa la scheda di un dipendente in maniera automatica prendendo le informazioni richieste dal Curriculum
     L'input è sempre il nome del dipendente"""
-    try:
-        declarative_memory = cat.working_memory.declarative_memories
-        curriculum = ""
-        for documento in declarative_memory:
-            doc = documento[0]
-            match = is_cv_matching(doc.metadata["source"], tool_input)
-            if match:
-                curriculum += doc.page_content
+    #try:
+    declarative_memory = cat.working_memory.declarative_memories
+    curriculum = ""
+    for documento in declarative_memory:
+        doc = documento[0]
+        match = is_cv_matching(doc.metadata["source"], tool_input)
+        if match:
+            curriculum += doc.page_content
 
-        prompt = f""""{curriculum}
-            Dal curriculum passato cerca, se ci sono, queste informazioni e scrivile in formato JSON
-            paese di residenza (private country)
-            numero di telefono (mobile phone)
-            email (private email)
-            campo di studi (study field)
-            scuola frequentata, in questo caso quella più recente (study school)
-            compleanno (birthday)
-            Se non è specificato metti come default null
-            In output metti solo i campi, senza mettere altro all'interno dell'output SENZA LA SCRITTA json INIZIALE"""
-        
-        out = cat.llm(prompt, stream = True)
-        result = complete_secondary_info(tool_input, out)
-        out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 
-                      Scrivi i seguenti dettagli in maniera chiara per l'utente:
-                    {result}
-                    Scrivi inoltre che se l'utente vuole aggiungere altre informazioni non specificate nel curriculum di visitare il link scritto nel risultato.
-                    """)
-        return out.replace("**", "")
-    except Exception as e:
-        return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
+    prompt = f""""{curriculum}
+        Dal curriculum passato cerca, se ci sono, queste informazioni e scrivile in formato JSON
+        paese di residenza (private country)
+        numero di telefono (mobile phone)
+        email (private email)
+        campo di studi (study field)
+        scuola frequentata, in questo caso quella più recente (study school)
+        compleanno (birthday)
+        Se non è specificato metti come default null
+        In output metti solo i campi, senza mettere altro all'interno dell'output SENZA LA SCRITTA json INIZIALE"""
+    
+    out = cat.llm(prompt, stream = True)
+    result = complete_secondary_info(tool_input, out)
+    if result is None:
+        return "Dipendente non trovato"
+    out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 
+                    Scrivi i seguenti dettagli in maniera chiara per l'utente:
+                {result}
+                Scrivi inoltre che se l'utente vuole aggiungere altre informazioni non specificate nel curriculum di visitare il link scritto nel risultato.
+                """)
+    return out.replace("**", "")
+    #except Exception as e:
+    #    return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
 
 @tool(
     return_direct = True,
@@ -197,39 +199,40 @@ def complete_employee_tool(tool_input, cat):
 def complete_curriculum_tool(tool_input, cat):
     """Completa la parte relativa alle esperienze lavorative e di studi del dipendente prendendole dal curriculum
     L'input è sempre il nome del dipendente"""
-    try:
-        declarative_memory = cat.working_memory.declarative_memories
-        curriculum = ""
-        for documento in declarative_memory:
-            doc = documento[0]
-            print("DOC.CONTENT", doc.page_content)
-            match = is_cv_matching(doc.metadata["source"], tool_input)
-            if match:
-                curriculum += doc.page_content
+    #try:
+    declarative_memory = cat.working_memory.declarative_memories
+    curriculum = ""
+    for documento in declarative_memory:
+        doc = documento[0]
+        print("DOC.CONTENT", doc.page_content)
+        match = is_cv_matching(doc.metadata["source"], tool_input)
+        if match:
+            curriculum += doc.page_content
 
-        prompt = f""""{curriculum}
-            Dal curriculum passato cerca, se ci sono, queste informazioni e scrivile in formato JSON
-            Trovi diverse informazioni crea diversi JSON
-            nome, è il nome della scuola, del posto di lavoro, o del progetto (name)
-            descrizione, è la descrizione BREVE (massimo 10 parole) del ruolo a lavoro, del progetto, o del percorso di studi (description)
-            data di inizio, è la data di fine del lavoro, del progetto o di quando ha iniziato a frequentare il percorso di studi (date_start)
-            data di fine, è la data di inizio del lavoro, del progetto o di quando ha finito di frequentare il percorso di studi (date_end)
-            Se non è specificato metti come default null
-            Se nelle date è specificato solo l'anno scrivi YYYY-01-01 per le date di inizio e YYYY-12-31 per le date di fine
-            In output metti solo i campi, senza mettere altro all'interno dell'output SENZA LA SCRITTA json INIZIALE
-            Infine aggiungi anche un campo che si chiama line_type_id che è:
-            2 -> Se si sta parlando di percorso di Istruzione (scuola, università, corsi ecc...)
-            1 -> Se si sta parlando di Esperienze di Lavoro o di volontariato
-            4 -> Se si sta parlando di progetti che non rientrano nel mondo del lavoro"""
-        
-        result = cat.llm(prompt)
-        info = complete_curriculum_info(tool_input, result)
-
-        out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 
-                      Scrivi i seguenti dettagli in maniera chiara per l'utente:
-                    {info}
-                    Scrivi inoltre che se l'utente vuole aggiungere altre informazioni non specificate nel curriculum di visitare il link scritto nel risultato.
-                    """)
-        return out.replace("**", "")
-    except Exception as e:
-        return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")
+    prompt = f""""{curriculum}
+        Dal curriculum passato cerca, se ci sono, queste informazioni e scrivile in formato JSON
+        Trovi diverse informazioni crea diversi JSON
+        nome, è il nome della scuola, del posto di lavoro, o del progetto (name)
+        descrizione, è la descrizione BREVE (massimo 10 parole) del ruolo a lavoro, del progetto, o del percorso di studi (description)
+        data di inizio, è la data di fine del lavoro, del progetto o di quando ha iniziato a frequentare il percorso di studi (date_start)
+        data di fine, è la data di inizio del lavoro, del progetto o di quando ha finito di frequentare il percorso di studi (date_end)
+        Se non è specificato metti come default null
+        Se nelle date è specificato solo l'anno scrivi YYYY-01-01 per le date di inizio e YYYY-12-31 per le date di fine
+        In output metti solo i campi, senza mettere altro all'interno dell'output SENZA LA SCRITTA json INIZIALE
+        Infine aggiungi anche un campo che si chiama line_type_id che è:
+        2 -> Se si sta parlando di percorso di Istruzione (scuola, università, corsi ecc...)
+        1 -> Se si sta parlando di Esperienze di Lavoro o di volontariato
+        4 -> Se si sta parlando di progetti che non rientrano nel mondo del lavoro"""
+    
+    result = cat.llm(prompt)
+    info = complete_curriculum_info(tool_input, result)
+    if info is None:
+        return "Dipendente non trovato"
+    out = cat.llm(f"""Scrivi che sono state aggiornate le informazioni recuperando i dati dal curriculum. 
+                    Scrivi i seguenti dettagli in maniera chiara per l'utente:
+                {info}
+                Scrivi inoltre che se l'utente vuole aggiungere altre informazioni non specificate nel curriculum di visitare il link scritto nel risultato.
+                """)
+    return out.replace("**", "")
+    #except Exception as e:
+     #   return cat.llm(f"Scrivi che si è verificato questo errore {str(e)}")

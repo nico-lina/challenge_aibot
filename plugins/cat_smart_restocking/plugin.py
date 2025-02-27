@@ -26,12 +26,17 @@ def predict_quantity(tool_input, cat):
 
     mark = predict_future_demand(prodotto_input, int(mesi_input))
 
+    if mark == "null":
+        return "Nessun prodotto disponibile"
+
     output = cat.llm(
         f""" Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per prodotto che farai
         
         {mark}
 
         Metti in evidenza le quantità previste mese per mese
+
+        Cosa importante, se hai degli errori non inventare le risposte ma riporta l'errore, inoltre non aggiungere commenti tuoi, la risposta deve essere diretta all'utente
         """, stream=True
     )
 
@@ -57,15 +62,18 @@ def predict_date(tool_input, cat):
     )
 
     # Ottieni la data suggerita di riordino
-    mark = suggest_reorder_date(prodotto_input)
-
+    mark = suggest_reorder_date(tool_input)
+    if mark == "null":
+        return "Nessun prodotto disponibile"
     # Formatta la risposta per l'utente
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per data e per nome prodotto.
         
         {mark}
 
-        Metti in evidenza le date previste per ogni prodotto."""
+        Metti in evidenza le date previste per ogni prodotto.
+        Cosa importante, se hai degli errori non inventare le risposte ma riporta l'errore, inoltre non aggiungere commenti tuoi, la risposta deve essere diretta all'utente
+        """
     )
     
     mark = pd.to_datetime(list(mark.values())[0])
@@ -81,7 +89,7 @@ def predict_date(tool_input, cat):
 
         # Genera il testo della notifica Telegram
         telegram_text = cat.llm(
-            f"""Scrivi un breve messaggio di notifica per informare che l'ordine del prodotto {prodotto_input} 
+            f"""Scrivi un breve messaggio di notifica per informare che l'ordine del prodotto {tool_input} 
             è stato inviato al fornitore via email."""
         )
 
@@ -91,7 +99,7 @@ def predict_date(tool_input, cat):
         # Invia la notifica Telegram
         send_telegram_notification(telegram_text)
 
-        return f"{output}\n✅ Ordine per **{prodotto_input}** inviato con successo al fornitore!"
+        return f"{output}\n✅ Ordine per **{tool_input}** inviato con successo al fornitore!"
 
     # Se l'utente rifiuta, termina l'operazione
     return output

@@ -23,7 +23,8 @@ from cat.plugins.super_cat_form.super_cat_form import SuperCatForm, form_tool, s
 def get_order_status(tool_input, cat):
     """Rispondi a domande sullo stato degli ordini e filtra per stato se richiesto."""
     mark = get_orders()
-    
+    if mark == "null":
+        return "Nessun prodotto trovato"
     # Se tool_input specifica uno stato, filtriamo gli ordini
     if tool_input:
         stato_richiesto = tool_input.lower()
@@ -135,7 +136,7 @@ class OrderForm(SuperCatForm):
             currency_id=currency  # Imposta l'ID della valuta corretta se necessario
         )
         prompt = (f"Scrivi che l'ordine è stato creato correttamente e scrivi in maniera riassuntiva i dettagli dell'ordine:\n{result}"
-                "Rispondi con una risposta diretta senza aggiungere commenti tuoi")
+                "Rispondi con una risposta diretta ma comprendendo i dettagli senza aggiungere commenti tuoi")
         return {"output": f"{self.cat.llm(prompt)}"}
 
     def message_wait_confirm(self):
@@ -143,7 +144,7 @@ class OrderForm(SuperCatForm):
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso creare l'ordine nel sistema? Rispondi dicendo Si puoi inserirlo'"
-            "Rispondi con una risposta diretta ma riassuntiva senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta ma che contenga il riassunto dei dati senza aggiungere commenti tuoi"
         )
 
         print(self._state)
@@ -155,7 +156,7 @@ class OrderForm(SuperCatForm):
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
             form di creazione dell'ordine."""
-            "Rispondi con una risposta diretta ma riassuntiva senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta ma che includa il riassunto dei dettagli fin'ora inseriti senza aggiungere commenti tuoi"
         )
         return {"output": f"{self.cat.llm(prompt)}"}
 
@@ -188,7 +189,7 @@ def complete_orders_tool(tool_input, cat):
             order_id = int(order_id.strip())
             result.append(complete_order(order_id))
         except ValueError:
-            result.append(f"Errore: ID ordine {order_id} non valido. Inserisci un numero intero.")
+            result.append(f"Errore: ID ordine {order_id} non valido.")
     
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente i risultati della chiusura degli ordini. 
@@ -227,7 +228,7 @@ def delete_order_tool(tool_input, cat):
             order_id = int(order_id.strip())
             result.append(delete_order(order_id))
         except ValueError:
-            result.append(f"Errore: ID ordine {order_id} non valido. Inserisci un numero intero.")
+            result.append(f"Errore: ID ordine {order_id} non valido.")
     
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente i risultati delle cancellazioni degli ordini. 
@@ -254,7 +255,8 @@ def get_products_to_reorder(tool_input, cat):
     """Rispondi a "Quali prodotti mi consigli di riordinare?", e domande simili. Input è sempre None.."""
 
     mark = auto_order()
-
+    if mark == "":
+        return "Non ho informazioni sui prodotti da riordinare"
     output = cat.llm(
        f"""
         Scrivi all'utente in modo chiaro quali prodotti dovrebbe riordinare, applicando una formattazione adeguata ai dati
@@ -266,6 +268,7 @@ def get_products_to_reorder(tool_input, cat):
         "Vorrei ordinare 5 unità di prodotto X e 10 unità di prodotto X",
         "Ordina 5 unità di prodotto X e 10 unità di prodotto X "
         Dove le X sono i prodotti che dovrebbero essere riordinati e le quantità sono quelle suggerite.
+        
         """, stream = True)
     
     output = output.replace("**", "")
@@ -282,8 +285,8 @@ def get_products_to_reorder(tool_input, cat):
 def get_order_details_tool(tool_input, cat):
     """Restituisci i dettagli di un ordine specifico."""
     order_id = int(tool_input)
-    print("ORDER ID", order_id)
     order_details = get_order_details(order_id)
+    
     if not order_details:
         return f"Errore: l'ordine con ID {order_id} non esiste. Inserisci un ID valido."
     
@@ -292,6 +295,8 @@ def get_order_details_tool(tool_input, cat):
         Completa la tabella con una descrizione per il prodotto in base al nome.
         Fornisci sempre un riassunto degli ordini.
         {order_details}
+        Se c'è un errore limitati a dire di che errore si tratta, il messaggio deve essere comunque breve
+
         """, stream=True)
     
     return output.replace("**", "")

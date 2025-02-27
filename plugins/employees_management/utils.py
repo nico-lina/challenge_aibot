@@ -8,9 +8,10 @@ import json
 def get_employees():
     """Recupera tutti i dipendenti da Odoo e restituisce una tabella formattata."""
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     HR_Employee = odoo.env['hr.employee']
@@ -43,9 +44,10 @@ def increment_department_employee_count(odoo, department_id):
 def create_employee(form_data, work_email):
     """Crea un nuovo dipendente in Odoo."""
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     name = form_data["name"]
@@ -59,7 +61,12 @@ def create_employee(form_data, work_email):
     department_id = get_department_id(odoo, job_id)
     parent_id = get_parent_id(odoo, department_id[0]) if department_id else None
     coach_id = parent_id  # Il coach è il manager del dipartimento
-
+    
+    if department_id is None:
+        department_id = [1]
+    if department_id is False:
+        department_id = [1]
+    print("DEPID:", department_id)
     HR_Employee = odoo.env['hr.employee']
     employee_id = HR_Employee.create({
         'name': name,
@@ -69,7 +76,6 @@ def create_employee(form_data, work_email):
         'job_id': job_id,
         'resource_calendar_id': resource_calendar,
         'department_id': department_id[0],
-        'work_location_id': 4,
         'parent_id': parent_id,
         'coach_id': coach_id
     })
@@ -97,9 +103,10 @@ def create_employee(form_data, work_email):
 def get_job_names():
     """Recupera tutti i job da Odoo e restituisce una tabella formattata."""
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     HR_Job = odoo.env['hr.job']
@@ -112,9 +119,10 @@ def get_job_names():
 def get_resource_calendar():
     """Recupera tutti i job da Odoo e restituisce una tabella formattata."""
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     HR_Job = odoo.env['resource.calendar']
@@ -126,10 +134,10 @@ def get_resource_calendar():
 def get_employee_by_name(employee_name):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
     
-    # Autenticazione
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
 
     Employee = odoo.env['hr.employee']
@@ -190,11 +198,12 @@ def is_cv_matching(cv_filename: str, full_name: str, threshold=80) -> bool:
 
 def get_country_id(country, threshold = 85):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
-    
+
     ResCountry = odoo.env['res.country']
     
     countries = ResCountry.search_read([], ['id', 'name'])
@@ -238,15 +247,17 @@ def get_country_id(country, threshold = 85):
 
 def complete_secondary_info(employee, stringa):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
-    
+
     Employee = odoo.env['hr.employee']
     
     emp_id = get_employee_by_name(employee)
-
+    if emp_id is None:
+        return None
     employee_mod = Employee.browse(emp_id['id'])
 
     data = json.loads(stringa)
@@ -285,9 +296,10 @@ def complete_secondary_info(employee, stringa):
 
 def complete_curriculum_info(employee, stringa, threshold=85):
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)  # Cambia host e porta se necessario
-    db = 'db_test'
-    username = 'prova@prova'
-    password = 'password'
+     # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
     odoo.login(db, username, password)
     
     EmployeeResume = odoo.env['hr.resume.line']
@@ -295,7 +307,7 @@ def complete_curriculum_info(employee, stringa, threshold=85):
     # Trova l'ID del dipendente
     emp_id = get_employee_by_name(employee)
     if not emp_id:
-        return {"error": "Employee not found"}
+        return None
     
     employee_mod = emp_id['id']  # Usa solo l'ID per browse
     print("EMPLOYEE", employee_mod)
