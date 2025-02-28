@@ -63,7 +63,7 @@ def get_warehouse():
 
         # Ottieni le quantità per il prodotto
         quants = StockQuant.search_read(
-            [("product_id", "=", product_id)],
+            [("product_id", "=", product_id), ("location_id", "=", 8)],
             ["quantity", "reserved_quantity"],
         )
         orderpoint = OrderPoint.search_read(

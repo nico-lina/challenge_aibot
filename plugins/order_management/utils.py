@@ -319,7 +319,7 @@ def auto_order():
         max_qty = orderpoint['product_max_qty']
         
         # Recupera la quantità attuale a magazzino per il prodotto
-        quants = StockQuant.search_read([('product_id', '=', product_id), ('quantity', '>=', 0)], ['quantity'])
+        quants = StockQuant.search_read([('product_id', '=', product_id), ('quantity', '>=', 0), ()], ['quantity'])
         current_qty = sum(q['quantity'] for q in quants)
         
         if current_qty < min_qty:

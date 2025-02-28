@@ -243,7 +243,7 @@ def get_supplier_performance_data():
     if df.empty : 
         return "null", df
     # Calcolare le performance
-    df['Tempo di Consegna'] = df['Tempo di Consegna '].fillna(0)  # Gestione dei valori nulli
+    df['Tempo di Consegna'] = df['Tempo di Consegna'].fillna(0)  # Gestione dei valori nulli
     
     # Calcolare performance aggregate per fornitore
     performance = df.groupby('Fornitore').agg({

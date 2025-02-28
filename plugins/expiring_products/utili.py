@@ -38,7 +38,7 @@ def get_expiration_dates():
 
         # Ottieni le quantità per il prodotto
         quants = StockQuant.search_read(
-            [("product_id", "=", product_id)],
+            [("product_id", "=", product_id), ("location_id", "=", 8)],
             ["quantity", "expiration_date"],
         )
 
@@ -111,8 +111,8 @@ def get_expiring_products(days_to_expire):
 
         # Ottieni le quantità e i lotti per il prodotto
         quants = StockQuant.search_read(
-            [("product_id", "=", product_id)],
-            ["quantity", "lot_id"],
+            [("product_id", "=", product_id), ("location_id", "=", 8)],
+            ["quantity", "lot_id", "company_id"],
         )
 
         for quant in quants:
@@ -133,13 +133,13 @@ def get_expiring_products(days_to_expire):
 
                 # Controlla se la data di scadenza rientra nel limite
                 if expiration_date <= expiration_limit:
-                    data.append(
-                        {
-                            "Prodotto": product_name,
-                            "Quantità Disponibile": quant.get("quantity", 0),
-                            "Data di Scadenza": expiration_date,
-                        }
-                    )
+                        data.append(
+                            {
+                                "Prodotto": product_name,
+                                "Quantità Disponibile": quant.get("quantity", 0),
+                                "Data di Scadenza": expiration_date,
+                            }
+                        )
 
     # Se non ci sono dati, restituisci un messaggio vuoto
     if not data:
