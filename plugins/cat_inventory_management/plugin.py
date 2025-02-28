@@ -169,7 +169,7 @@ vecchi fornitori inseriti.
 
         if result:
             return {
-                "output": f'Ho creato il fornitore <a href="{link}" target="_blank"> {supplier_name}</a> -{self._state}'
+                "output": f'Ho creato il fornitore <a href="{link}" target="_blank"> {supplier_name}</a>'
             }
         else:
             return {"output": "Non ho potuto creare il fornitore"}
@@ -276,7 +276,7 @@ vecchi clienti inseriti.
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso inserire il cliente nel sistema? Rispondi dicendo Si puoi inserirlo'"
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta ma che contenga i dettagli finora inseriti senza aggiungere commenti tuoi"
 
         )
 

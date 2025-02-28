@@ -66,7 +66,6 @@ def get_order_status(tool_input, cat):
     
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente, applicando una formattazione adeguata i dati contenuti in questa tabella.
-        Completa la tabella con una descrizione per il prodotto in base al nome.
         Fornisci sempre un riassunto degli ordini.
         {mark}
         """, stream=True)

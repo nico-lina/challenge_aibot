@@ -120,7 +120,8 @@ def create_product(product_name, product_qty, product_min_qty, product_descripti
             "categ_id": 1,
             "description": product_description,
             "type" : 'consu',
-            "standard_price" : product_price
+            "standard_price" : product_price,
+            "list_price" : product_price,
         }
     )
 
