@@ -10,10 +10,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 import os
 import time
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter, landscape, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import re
 from bs4 import BeautifulSoup
+from reportlab.lib.units import cm
 
 
 
@@ -91,13 +92,10 @@ def get_stock_report():
         data.append({
             'Nome Prodotto': product_name,
             'Codice Prodotto': product_code,
-            'Categoria': category,
             'Quantità Disponibile': quantity,
-            'Soglia Minima': min_quantity,
-            'Threshold': threshold_rounded,
             'Stato': status,
             'Prezzo Unitario (€)': price,
-            'Valore Totale (€)': total_value,
+            'Prezzo Totale (€)': total_value,
         })
 
     df = pd.DataFrame(data)
@@ -156,7 +154,6 @@ def get_stock_movements():
         data.append({
             'Nome del Prodotto': product_name,
             'Codice del Prodotto': product_code,
-            'Categoria Prodotto': product_category,
             'Data': move_date,
             'Tipo Movimento': movement_type,
             'Quantità': move['product_uom_qty'],
@@ -194,14 +191,11 @@ def get_supplier_performance_data():
     purchase_orders = Purchase.search_read([('state', 'in', ['done', 'purchase'])], ['name', 'partner_id', 'order_line', 'effective_date', 'date_planned', 'date_order'])
 
     data = []
-    print("PURCHASE ORDER: ",purchase_orders)
     for order in purchase_orders:
-        print("ORDER", order)
         # Ottenere i dettagli del fornitore
         supplier_id = order['partner_id'][0]
         supplier_data = Supplier.search_read([('id', '=', supplier_id)], ['name', 'email'])
         supplier_info = supplier_data[0]
-        print("SUPPLIER INFO:", supplier_info)
     
         for line_id in order['order_line']:
             lines = OrderLine.search_read([('id', '=', line_id)], ['product_id', 'product_qty', 'price_unit', 'price_total'])
@@ -212,9 +206,7 @@ def get_supplier_performance_data():
             date_order = datetime.strptime(order['date_order'], '%Y-%m-%d %H:%M:%S')
             date_planned = datetime.strptime(order['date_planned'], '%Y-%m-%d %H:%M:%S')
             effective_date = datetime.strptime(order['effective_date'], '%Y-%m-%d %H:%M:%S') if order['effective_date'] else None
-            print("DATE ORDER: ", date_order)
-            print("DATE PLANNED: ", date_planned)
-            print ("EFFECTIVE DATE", effective_date)
+            
             # Calcolo del ritardo di consegna
             if date_planned:
                 if effective_date is not None:
@@ -241,8 +233,8 @@ def get_supplier_performance_data():
                 'Prodotto': product_data[0]['name'],
                 'Quantità': line['product_qty'],
                 'Prezzo Totale': line['price_total'],
-                'Tempo di Consegna (giorni)': delivery_time,
-                'Ritardo di Consegna (giorni)': delay
+                'Tempo di Consegna': delivery_time,
+                'Ritardo di Consegna': delay
             })
 
 
@@ -251,24 +243,23 @@ def get_supplier_performance_data():
     if df.empty : 
         return "null", df
     # Calcolare le performance
-    df['Tempo di Consegna (giorni)'] = df['Tempo di Consegna (giorni)'].fillna(0)  # Gestione dei valori nulli
+    df['Tempo di Consegna'] = df['Tempo di Consegna '].fillna(0)  # Gestione dei valori nulli
     
     # Calcolare performance aggregate per fornitore
     performance = df.groupby('Fornitore').agg({
-        'Tempo di Consegna (giorni)': 'mean',
+        'Tempo di Consegna': 'mean',
         'Quantità': 'sum',
         'Prezzo Totale': 'sum',
-        'Ritardo di Consegna (giorni)': 'mean'
+        'Ritardo di Consegna': 'mean'
     }).reset_index()
 
-    performance['Performance'] = performance['Tempo di Consegna (giorni)'].apply(get_performance_indicator)
+    performance['Performance'] = performance['Tempo di Consegna'].apply(get_performance_indicator)
 
     performance_markdown = performance.to_markdown(index=False)
     df_markdown = df.to_markdown(index=False)
 
 
-    return df_markdown, performance_markdown
-
+    return performance_markdown, performance
 
 
 # Funzione per generare il report
@@ -276,7 +267,7 @@ def generate_warehouse_report():
 
     stock, _ = get_stock_report()
     stock_movement, _ = get_stock_movements()
-    _, supplier = get_supplier_performance_data()
+    supplier,_ = get_supplier_performance_data()
 
     return stock, stock_movement, supplier
 
@@ -303,21 +294,41 @@ def plot_stock_trend():
 
 
 def write_pdf(markdown_text, file_name):
-    html_text = markdown(markdown_text)
-    soup = BeautifulSoup(html_text, "html.parser")
 
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     pdf_filename = f"{file_name}_{current_time}.pdf"
 
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
     output_dir = os.path.join(base_dir, "static")
-
     os.makedirs(output_dir, exist_ok=True)
     pdf_path = os.path.join(output_dir, pdf_filename)
 
     doc = SimpleDocTemplate(pdf_path, pagesize=landscape(letter), leftMargin=20, rightMargin=20)
-    styles = getSampleStyleSheet()
+
+    # Converti il testo Markdown in HTML
+    html_text = markdown(markdown_text)
+
+    # Usa BeautifulSoup per analizzare l'HTML
+    soup = BeautifulSoup(html_text, "html.parser")
+
+    # Definizione della lista per i contenuti del PDF
     story = []
+    styles = getSampleStyleSheet()
+    heading_style = styles['Heading1']
+    subheading_style = styles['Heading2']
+    subsubheading_style = styles['Heading3']
+    normal_style = ParagraphStyle(
+            "Normal",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=12,  # Modifica la dimensione del font
+            leading=18,
+            textColor=(0, 0, 0),  # Colore del testo (nero)
+        )
+
+    print("HTML: ", html_text)
+    table_pattern = re.compile(r'(\|.*\|\n)+')
+
 
     def parse_markdown_table(text):
         lines = text.strip().split('\n')
@@ -332,51 +343,55 @@ def write_pdf(markdown_text, file_name):
     def parse_table(text):
         table_data = parse_markdown_table(text)
 
-        if table_data:
-            col_widths = [80] * len(table_data[0])
-            table = Table(table_data, repeatRows=1, colWidths=col_widths, hAlign='CENTER')
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-                ("WORDWRAP", (0, 0), (-1, -1), 'CJK'),  # Wrapping per testo lungo
-            ]))
+        styleN = styles['Normal']
+        styleN.fontSize = 8  # Imposta una dimensione del font più piccola
 
-            for i, row in enumerate(table_data[1:], start=1):
-                if len(row) >= 7:
-                    stato = row[6]
-                    color = colors.black
-                    if '🔴' in stato:
-                        color = colors.red
-                    elif '🟠' in stato:
-                        color = colors.orange
-                    elif '🟢' in stato:
-                        color = colors.green
-                    table.setStyle([("TEXTCOLOR", (6, i), (6, i), color)])
+        # Convert long text cells into Paragraphs for wrapping
+        for row in table_data[1:]:
+            for i in range(len(row)):
+                if len(row[i]) > 15:  # Example threshold for long text
+                    row[i] = Paragraph(row[i], styleN)
 
-            story.append(table)
-            story.append(Spacer(1, 12))
+        num_cols = len(table_data[0])
+
+        # Larghezza delle colonne adattabile
+        max_width = A4[0] - 0.5 * cm  # Larghezza massima della pagina meno margini
+        col_widths = [max_width / num_cols] * num_cols  # Larghezza uniforme
+
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+        # Stile migliorato per evitare il testo fuoriuscente
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),  # Testo più piccolo
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("WORDWRAP", (0, 0), (-1, -1), "CJK"),  # Word wrap attivato
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+            # Impostazioni specifiche per l'intestazione
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Grassetto per l'intestazione
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#7AC4FF")),  # sfondo azzurro per l'header 
+        ]))
+
+        story.append(Spacer(1, 12))
+        story.append(table)
+        story.append(Spacer(1, 12))
+
 
     def parse_list(element):
         items = [li.get_text(strip=True) for li in element.find_all("li")]
         if items:
             for item in items:
-                if '🔴' in item:
-                    story.append(Paragraph(f'<font color="red">• {item}</font>', styles["Normal"]))
-                elif '🟠' in item:
-                    story.append(Paragraph(f'<font color="orange">• {item}</font>', styles["Normal"]))
-                elif '🟢' in item:
-                    story.append(Paragraph(f'<font color="green">• {item}</font>', styles["Normal"]))
-                else:
-                    story.append(Paragraph(f"• {item}", styles["Normal"]))
+                item = item.replace(':', ': ')  # Aggiunge spazio dopo i due punti
+                story.append(Paragraph(f"• {item}", styles["Normal"]))
+
             story.append(Spacer(1, 12))
 
-    table_pattern = re.compile(r'(\|.*\|\n)+')
 
+    # Scorri tutti gli elementi HTML rilevanti
     for element in soup.find_all(["h1", "h2", "h3", "p", "ul", "li"]):
         text = element.get_text(strip=True)
 
@@ -384,18 +399,23 @@ def write_pdf(markdown_text, file_name):
             parse_table(text)
 
         elif element.name == "ul":
-            parse_list(element)
-
+            # For lists, process each list item
+            for li in element.find_all('li'):
+                story.append(Spacer(1, 6))
+                story.append(Paragraph(f"• {li.text}", normal_style))
         else:
             if element.name == "h1":
-                story.append(Paragraph(text, styles["Title"]))
+                story.append(Spacer(1, 8))
+                story.append(Paragraph(f"<font size=14>{element.text}</font>", heading_style))
             elif element.name == "h2":
-                story.append(Paragraph(text, styles["Heading1"]))
+                story.append(Spacer(1, 8))
+                story.append(Paragraph(f"<font size=12>{element.text}</font>", subheading_style))
             elif element.name == "h3":
-                story.append(Paragraph(text, styles["Heading2"]))
-            else:
-                story.append(Paragraph(text, styles["Normal"]))
-            story.append(Spacer(1, 12))
+                story.append(Spacer(1, 8))
+                story.append(Paragraph(f"<font size=10>{element.text}</font>", subsubheading_style))
+            elif element.name == "p":
+                story.append(Spacer(1, 6))
+                story.append(Paragraph(element.text, normal_style))
 
     doc.build(story)
     print(f"✅ PDF creato: {pdf_path}")
