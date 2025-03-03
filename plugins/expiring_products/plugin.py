@@ -52,8 +52,8 @@ def get_the_expiring_products(tool_input, cat):
         
         Usa questa formattazione:
         "
-        1. Nome prodotto: data di scadenza
-        2. Nome prodotto: data di scadenza
+        1. Nome prodotto: data di scadenza (in formato dd-mm-YYYY)
+        2. Nome prodotto: data di scadenza (in formato dd-mm-YYYY)
         "
         Non mostrare quantità disponibile, quantità riservata e quantità minima
         """,

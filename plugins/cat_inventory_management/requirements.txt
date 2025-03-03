@@ -5,3 +5,4 @@ odoorpc
 mailslurp-client
 telepot
 pydantic[email]
+mailtrap

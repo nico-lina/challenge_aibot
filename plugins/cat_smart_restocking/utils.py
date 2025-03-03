@@ -147,8 +147,10 @@ def suggest_reorder_date(name, months_ahead=3):
     order_df = pd.DataFrame(order_data)
 
     if stock_df.empty:
-        raise ValueError("Nessun dato di stock disponibile.")
-    
+        return "null"
+    if order_df.empty:
+        return "null"
+
     order_df.rename(columns={'date_planned': 'date_order'}, inplace=True)
     order_df['date_order'] = pd.to_datetime(order_df['date_order'])
 
@@ -192,39 +194,11 @@ def suggest_reorder_date(name, months_ahead=3):
     return reorder_dates
 
 
-
-# def send_mail(mail_text, mail_sbj, recipient_email):
-#     """
-#     Invia un'email al fornitore con le informazioni per il riordino.
-#     """
-
-#     # Configura le credenziali (meglio impostarle come variabili d'ambiente per sicurezza)
-#     sender_email = os.getenv("SMTP_EMAIL", "camilla.casaleggi@gmail.com")
-#     sender_password = os.getenv("SMTP_PASSWORD", "fbtsrdirhiopcdvs")
-#     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-#     smtp_port = int(os.getenv("SMTP_PORT", 587))
-
-#     # Configura il messaggio email
-#     msg = MIMEMultipart()
-#     msg["From"] = sender_email
-#     msg["To"] = recipient_email
-#     msg["Subject"] = mail_sbj
-#     msg.attach(MIMEText(mail_text, "html"))  # Email in formato HTML
-
-#     # Connessione al server SMTP
-#     server = smtplib.SMTP(smtp_server, smtp_port)
-#     server.starttls()  # Abilita la crittografia TLS
-#     server.login(sender_email, sender_password)  # Login con credenziali
-#     server.sendmail(sender_email, recipient_email, msg.as_string())  # Invia email
-#     server.quit()  # Chiudi connessione
-
-#     print(f"✅ Email inviata con successo a {recipient_email}")
-
 def send_telegram_notification(telegram_text):
     TOKEN = "7539382660:AAHvKE6ovESYyNjodPmVknXmnQqj3omXTiM"
     #TOKEN = "8042065744:AAF-t4WC2Gb5t7ckcYMGnmTXJmYPtZNuXzM"
     bot = telepot.Bot(TOKEN)
-    bot.sendMessage(145386464, telegram_text, parse_mode="HTML")
+    bot.sendMessage(7878972936, telegram_text, parse_mode="HTML")
 
 # Funzione principale per gestire gli ordini ai fornitori
 def process_supplier_orders(prodotto):
@@ -255,16 +229,3 @@ def process_supplier_orders(prodotto):
         if reorder_date[product] <= datetime.today().strftime('%Y-%m-%d'):
             return supplier["email"]
 
-# Monitoraggio delle prestazioni dei fornitori
-# def track_supplier_performance(supplier_id, delivery_date, expected_date, quality_rating, performance_db):
-#     delay = (delivery_date - expected_date).days
-#     performance_db.append({
-#         "supplier_id": supplier_id,
-#         "delivery_date": delivery_date,
-#         "expected_date": expected_date,
-#         "delay": delay,
-#         "quality_rating": quality_rating,
-#     })
-    
-#     if delay > 3:
-#         send_telegram_notification(119405630, f"⚠️ Ritardo nella consegna da {supplier_id}: {delay} giorni di ritardo!")

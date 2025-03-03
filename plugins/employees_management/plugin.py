@@ -97,7 +97,7 @@ class EmployeeForm(SuperCatForm):
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
             "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Rispondi dicendo Si puoi inserirlo'"
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"        
+            "Rispondi con una risposta diretta che contenga il riassunto dei dati inseriti senza aggiungere commenti tuoi"        
         )
 
         return {"output": f"{self.cat.llm(prompt)}"}
@@ -113,7 +113,7 @@ class EmployeeForm(SuperCatForm):
             Per aiutare l'utente dai queste informazioni sugli id dei job e dei calendari.
             id dei job: {job_names}
             id dei calendari: {department_names}
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta che comprenda i dati inseriti senza aggiungere commenti tuoi"
             """
         )
         return {"output": f"{self.cat.llm(prompt)}"}

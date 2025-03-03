@@ -4,7 +4,6 @@ from cat.mad_hatter.decorators import tool
 from datetime import datetime, timedelta
 from .utils import predict_future_demand, suggest_reorder_date, process_supplier_orders, send_telegram_notification
 
-
 @tool(
     return_direct=True,
     examples=[
@@ -64,7 +63,7 @@ def predict_date(tool_input, cat):
     # Ottieni la data suggerita di riordino
     mark = suggest_reorder_date(tool_input)
     if mark == "null":
-        return "Nessun prodotto disponibile"
+        return f"❌ Qualche dato sul prodotto {tool_input} non è disponibile, non posso fornire la predizione su quando dovrai riordinarlo"
     # Formatta la risposta per l'utente
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per data e per nome prodotto.
@@ -89,8 +88,9 @@ def predict_date(tool_input, cat):
 
         # Genera il testo della notifica Telegram
         telegram_text = cat.llm(
-            f"""Scrivi un breve messaggio di notifica per informare che l'ordine del prodotto {tool_input} 
-            è stato inviato al fornitore via email."""
+            f"""Scrivi un breve messaggio di notifica per informare che la richiesta di riordinare il del prodotto {tool_input} 
+            è stato inviato al responsabile di magazzino.
+            Firmati come Oodvisor"""
         )
 
         # Invia la mail
@@ -99,7 +99,7 @@ def predict_date(tool_input, cat):
         # Invia la notifica Telegram
         send_telegram_notification(telegram_text)
 
-        return f"{output}\n✅ Ordine per **{tool_input}** inviato con successo al fornitore!"
+        return f"{output}\n✅ Notifica per **{tool_input}** inviata con successo al responsabile di magazzino!"
 
     # Se l'utente rifiuta, termina l'operazione
     return output

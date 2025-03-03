@@ -27,7 +27,7 @@ def get_the_warehouse_status(tool_input, cat):
     mark, _ = get_warehouse()
 
     output = cat.llm(
-        f"""Riscrivi, in modo chiaro per l'utente, applicando una formattazione adeguata e senza usare tabelle, i dati contenuti in questa tabella:
+        f"""Mostra i dati:
         
         {mark}
         
@@ -35,7 +35,7 @@ def get_the_warehouse_status(tool_input, cat):
         """,
         stream=True,
     )
-    output = output.replace("**", "")
+    # output = output.replace("**", "")
 
     return output
 
@@ -103,21 +103,21 @@ def send_mail_to_wh_manager(tool_input, cat):
         cat.llm(f"""Prepara il testo di una mail che dica al responsabile di ordinare
                         i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. 
                         Formatta con HTML la mail ma scrivendo solo il body della mail.
-                        Inserisci come nome del responsabile Luca Marino. Firmati come il tuo AIbot di Fiducia""")
+                        Inserisci come nome del responsabile Luca Marino. Firmati come Oodvisor""")
         .replace("```html", "")
         .replace("```", "")
     )
 
-    #send_mail(mail_text, "Notifica Riordino Prodotti")
+    send_mail(mail_text, "Notifica Riordino Prodotti")
     telegram_text = (
         cat.llm(f"""Prepara il testo di un messaggio telegram che dica al responsabile di ordinare
                         i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. Formatta la tabella con il tag <code>.
-                        Inserisci come nome del responsabile Luca Marino. Firmati come il tuo AIbot di Fiducia""")
+                        Inserisci come nome del responsabile Luca Marino. Firmati come Oodvisor""")
         .replace("```html", "")
         .replace("```", "")
     )
     send_telegram_notification(telegram_text)
-    return "Mail inviata"
+    return "Notifica inviata"
 
 
 class Supplier(BaseModel):
@@ -190,7 +190,7 @@ vecchi fornitori inseriti.
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
             form di inserimento del fornitore
-            Rispondi con una risposta diretta senza aggiungere commenti tuoi"""
+            Rispondi con una risposta diretta con il riassunto dei dati inseriti finora senza aggiungere commenti tuoi"""
         )
         return {"output": f"{self.cat.llm(prompt)}"}
     
@@ -232,16 +232,12 @@ vecchi clienti inseriti.
         "Voglio inserire un cliente",
         "Aiutami ad inserire un cliente",
         "Aiutami ad inserire un nuovo cliente",
-        "Aggiungiamo un nuovo cliente",
-        "Aggiungiamo un cliente",
     ]
     stop_examples = [
         "Non voglio più inserire il cliente",
         "Non voglio più inserire il nuovo cliente",
         "Ho finito con l'aggiunta di un nuovo cliente",
         "Ho finito con l'inserimento di un nuovo cliente",
-        "Sì",
-        "Sì puoi inserirlo",
     ]
 
     ask_confirm = True
@@ -288,7 +284,7 @@ vecchi clienti inseriti.
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il 
             form di inserimento del cliente. Digli che il tipo di cliente può essere solo o persona fisica o azienda"""
-            "Rispondi con una risposta diretta senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta che contenga i dettagli inseriti finora senza aggiungere commenti tuoi"
 
         )
         return {"output": f"{self.cat.llm(prompt)}"}

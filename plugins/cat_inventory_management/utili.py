@@ -4,6 +4,8 @@ import psycopg2 as psql
 import mailslurp_client
 from mailslurp_client import ApiClient, SendEmailOptions
 import telepot
+import mailtrap as mt
+
 
 # from config import config
 
@@ -153,28 +155,17 @@ def create_product(product_name, product_qty, product_min_qty, product_descripti
 
 
 def send_mail(mail_text, mail_sbj):
-    # Configura l'API
-    configuration = mailslurp_client.Configuration()
-    # configuration.api_key["x-api-key"] = (
-    #     "5dc12d2c8d8db594054b652023c644844d324a8a3d3694c3a34f7a45283c2dec"
-    # )
-    configuration.api_key["x-api-key"] = ("8606b4407c80286fcdeb82a056591d091da161ac99133a6c55afcf50561bc53f")
-    with ApiClient(configuration) as api_client:
-        api_instance = mailslurp_client.InboxControllerApi(api_client)
+    mail = mt.Mail(
+    sender=mt.Address(email="hello@demomailtrap.co", name="Mailtrap Test"),
+    to=[mt.Address(email="lorenzooglietti1@gmail.com")],
+    subject= mail_sbj,
+    html=mail_text,
+    category="Notifica magazzino",
+)
 
-        # Crea una email temporanea
-        inbox = api_instance.create_inbox()
-        print(f"Indirizzo email temporaneo: {inbox.email_address}")
-
-        # Invia email dall'inbox creato
-        send_options = SendEmailOptions(
-            to=["lorenzo.oglietti@libero.it"],
-            subject=mail_sbj,
-            body=mail_text,
-            is_html=True,
-        )
-
-        api_instance.send_email(inbox.id, send_options)
+    client = mt.MailtrapClient(token="102559b73322273cc1d082e1a4a16b9b")
+    response = client.send(mail)
+    print(response)
 
 
 def send_telegram_notification(telegram_text):
