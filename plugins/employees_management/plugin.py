@@ -22,6 +22,7 @@ def get_employees_tool(tool_input, cat):
         output = cat.llm(
             f"""Scrivi in modo chiaro per l'utente, applicando una formattazione adeguata ai dati contenuti in questa tabella.
             {mark}
+            Limitati a scrivere in maniera formattata i dati, non aggiungere altri commenti.
             """, stream=True) 
         return output.replace("**", "")
     except Exception as e:

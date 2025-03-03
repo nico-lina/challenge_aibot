@@ -47,7 +47,7 @@ def predict_quantity(tool_input, cat):
     return_direct=True,
     examples=[
         "Entro quando devo ordinare il prodotto 1 per non andare sotto la soglia minima?",
-        "Quanti prodotti mancano per raggiungere la soglia minima? Devo riordinare?",
+        "Quante unità di prodotto X mancano per raggiungere la soglia minima? Devo riordinare?",
         "Quando esaurirò il prodotto 1? Dimmi data di riordino stimata"
     ]
 )
@@ -63,7 +63,7 @@ def predict_date(tool_input, cat):
     # Ottieni la data suggerita di riordino
     mark = suggest_reorder_date(tool_input)
     if mark == "null":
-        return f"❌ Qualche dato sul prodotto {tool_input} non è disponibile, non posso fornire la predizione su quando dovrai riordinarlo"
+        return f"❌ Qualche dato sul prodotto {tool_input} non è disponibile, non posso fornire la previsione su quando dovrai riordinarlo"
     # Formatta la risposta per l'utente
     output = cat.llm(
         f"""Scrivi in modo chiaro per l'utente, adeguando la formattazione alle previsioni per data e per nome prodotto.
