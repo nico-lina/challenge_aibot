@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 import math
 from markdown import markdown
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 import os
 import time
 from reportlab.lib import colors
@@ -15,12 +15,15 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import re
 from bs4 import BeautifulSoup
 from reportlab.lib.units import cm
+import seaborn as sns
+import matplotlib.dates as mdates
+
 
 
 
 # Connessione a Odoo
 def connect_to_odoo():
-    db = 'test'
+    db = 'health_final'
     username = 'admin'
     password = 'admin'    
     odoo = odoorpc.ODOO('host.docker.internal', port=8069)
@@ -91,7 +94,6 @@ def get_stock_report():
 
         data.append({
             'Nome Prodotto': product_name,
-            'Codice Prodotto': product_code,
             'Quantità': quantity,
             'Stato': status,
             'Prezzo Unitario (€)': price,
@@ -153,12 +155,10 @@ def get_stock_movements():
 
         data.append({
             'Nome del Prodotto': product_name,
-            'Codice del Prodotto': product_code,
             'Data': move_date,
             'Tipo Movimento': movement_type,
             'Quantità': move['product_uom_qty'],
             'Fornitore': stakeholder_name,
-            'Indirizzo Fornitore': stakeholder_address,
             'Email Fornitore': stakeholder_email,
         })
 
@@ -261,17 +261,6 @@ def get_supplier_performance_data():
     return performance_markdown, performance
 
 
-
-# Funzione per generare il report
-def generate_warehouse_report():
-
-    stock, _ = get_stock_report()
-    stock_movement, _ = get_stock_movements()
-    supplier, _ = get_supplier_performance_data()
-
-    return stock, stock_movement, supplier
-
-
 # Analisi del valore dello stock nel tempo
 def plot_stock_trend():
     odoo = connect_to_odoo()
@@ -293,15 +282,23 @@ def plot_stock_trend():
     plt.show()
 
 
-def write_pdf(markdown_text, file_name):
+def create_file_path(file_name, ext):
 
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    pdf_filename = f"{file_name}_{current_time}.pdf"
+    pdf_filename = f"{file_name}_{current_time}.{ext}"
 
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
     output_dir = os.path.join(base_dir, "static")
+
     os.makedirs(output_dir, exist_ok=True)
     pdf_path = os.path.join(output_dir, pdf_filename)
+
+    return pdf_path
+
+
+def write_pdf(markdown_text, file_name, df1=None, df2=None, df3=None):
+
+    pdf_path = create_file_path(file_name, "pdf")
 
     doc = SimpleDocTemplate(pdf_path, pagesize=landscape(letter), leftMargin=20, rightMargin=20)
 
@@ -417,7 +414,191 @@ def write_pdf(markdown_text, file_name):
                 story.append(Spacer(1, 6))
                 story.append(Paragraph(element.text, normal_style))
 
+    def add_images(file_name, df1=None, df2=None, df3=None):
+
+        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 12))
+        story.append(Paragraph(f"<font size=14>Approfondimenti Visivi</font>", heading_style))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph("In questa sezione sono presentate alcune immagini create per supportare l'analisi e i risultati discussi nelle sezioni precedenti del report. Questi visualizzazioni offrono una comprensione più chiara della situazione del magazzino, arricchendo la narrazione complessiva.", normal_style))
+        story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+        if file_name == "report_livelli_stock":
+            story.append(Paragraph(f"<font size=12>Livelli di Stock</font>", subheading_style))
+            image_path = generate_stock_chart(df1)
+            story.append(Image(image_path, width=700, height=300))
+            story.append(Paragraph("Figura: Quantità Disponibile e Prezzo Totale per Prodotto nel Magazzino", styles["Italic"]))
+            story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+
+        elif file_name == "report_movimenti_magazzino":
+            story.append(Paragraph(f"<font size=12>Movimenti di Magazzino</font>", subheading_style))
+            image_path = plot_movements_over_time(df1)
+            story.append(Image(image_path, width=700, height=300))
+            story.append(Paragraph("Figura: Distribuzione dei Movimenti nel Tempo suddivisi per Tipologia", styles["Italic"]))
+            story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+
+        elif file_name == "report_performance_fornitori":
+            story.append(Paragraph(f"<font size=12>Performance dei Fornitori</font>", subheading_style))
+            image_path = plot_supplier_performance(df1)
+            story.append(Image(image_path, width=700, height=300))
+            story.append(Paragraph("Figura: Prestazioni dei Fornitori", styles["Italic"]))
+            story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+
+        else:
+            story.append(Paragraph(f"<font size=12>Livelli di Stock</font>", subheading_style))
+            image_path = generate_stock_chart(df1)
+            story.append(Image(image_path, width=700, height=300))
+            story.append(Paragraph("Figura 1: Quantità Disponibile per Prodotto nel Magazzino", styles["Italic"]))
+            story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+
+            story.append(Paragraph(f"<font size=12>Movimenti di Magazzino</font>", subheading_style))
+            image_path = plot_movements_over_time(df2)
+            story.append(Image(image_path, width=700, height=300))
+            story.append(Paragraph("Figura 2: Distribuzione dei Movimenti nel Tempo suddivisi per Tipologia", styles["Italic"]))
+            story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+
+            story.append(Paragraph(f"<font size=12>Performance dei Fornitori</font>", subheading_style))
+            image_path = plot_supplier_performance(df3)
+            story.append(Image(image_path, width=700, height=300))
+            story.append(Paragraph("Figura 3: Prestazioni dei Fornitori", styles["Italic"]))
+            story.append(Spacer(1, 12)),  # Spazio tra il testo e l'immagine
+
+
+
+
+    add_images(file_name, df1, df2, df3)
     doc.build(story)
     print(f"✅ PDF creato: {pdf_path}")
 
 
+
+
+def generate_stock_chart(stock_data):
+    # Estrai le informazioni dal DataFrame
+    prodotti = stock_data['Nome Prodotto']
+    quantità_disponibili = stock_data["Quantità"]
+    prezzo_totale = stock_data["Prezzo Totale (€)"]
+
+    # Creazione della figura con 2 sottotrame (side by side)
+    fig, ax = plt.subplots(1, 2, figsize=(18, 6))
+
+    # Grafico per la quantità disponibile per prodotto
+    ax[0].bar(prodotti, quantità_disponibili, color='skyblue')
+    ax[0].set_title('Quantità Disponibile per Prodotto nel Magazzino')
+    ax[0].set_ylabel('Quantità Disponibile')
+    ax[0].tick_params(axis='x', rotation=45)
+    ax[0].grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Grafico per la distribuzione del prezzo totale per prodotto
+    ax[1].bar(prodotti, prezzo_totale, color='lightgreen')
+    ax[1].set_title('Distribuzione del Prezzo Totale per Prodotto')
+    ax[1].set_ylabel('Prezzo Totale (€)')
+    ax[1].tick_params(axis='x', rotation=45)
+    ax[1].grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Ottimizzazione del layout
+    plt.tight_layout()
+
+    # Mostra i grafici
+    plt.show()
+
+    # Salva l'immagine su file
+    filename = "stock_magazzino"
+    file_path = create_file_path(filename, "png")
+    fig.savefig(file_path)
+    plt.close()
+
+    return file_path
+
+
+
+
+def plot_movements_over_time(df):
+
+    print(df)
+    df["Data"] = pd.to_datetime(df["Data"])
+    df.set_index('Data', inplace=True)
+
+    # Mappatura delle etichette per chiarezza
+    df["Tipo Movimento"] = df["Tipo Movimento"].replace({
+        "🟢 Entrata": "Entrata",
+        "🔴 Uscita": "Uscita"
+    })
+
+    # Dizionario colori: verde per "Entrata", rosso per "Uscita"
+    colori = {"Entrata": "green", "Uscita": "red"}
+
+    df_grouped = df.groupby(["Data", "Tipo Movimento"]).size().unstack(fill_value=0)
+
+    print(df_grouped)
+
+    # Creazione del grafico
+    plt.figure(figsize=(10, 6))
+    for movimento in df_grouped.columns:
+        plt.plot(df_grouped.index, df_grouped[movimento], marker='o', label=movimento, color=colori[movimento])
+
+    # Personalizzazione del grafico
+    plt.title('Distribuzione dei Movimenti nel Tempo (Entrata vs Uscita)')
+    plt.ylabel("Numero di Movimenti")
+
+    plt.legend(title="Tipo Movimento")
+    plt.grid(True)
+
+    # Mostrare il grafico
+    plt.show()
+
+    # Salva l'immagine su file
+    filename = "movimenti_magazzino"
+    file_path = create_file_path(filename, "png")
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path
+
+
+
+
+
+def plot_supplier_performance(df):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    print(df)
+    # Grafico a barre per Quantità e Prezzo Totale
+    ax = axes[0]
+    bar1 = ax.bar(df['Fornitore'], df['Quantità'], width=0.4, color='b', label='Quantità', align='center')
+    bar2 = ax.bar(df['Fornitore'], df['Prezzo Totale'], width=0.4, color='g', label='Prezzo Totale', align='edge')
+
+    # Manually set the legend
+    ax.legend([bar1, bar2], ['Quantità', 'Prezzo Totale'], loc='best')
+    
+    ax.set_title('Quantità e Prezzo Totale per Fornitore')
+    ax.set_ylabel('Valore')
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    ax.set_xticks(range(len(df['Fornitore'])))  # Imposta i tick corretti
+    ax.set_xticklabels(df['Fornitore'], rotation=45, ha='right')  # Assegna le etichette
+    
+    # Grafico a linee per Tempo di Consegna e Ritardo Medio
+    ax2 = axes[1]
+    df.plot(x='Fornitore', y=['Tempo di Consegna', 'Ritardo di Consegna'], kind='line', ax=ax2, marker='o')
+    ax2.set_title('Tempi di Consegna e Ritardo Medio per Fornitore')
+    ax2.set_ylabel('Giorni')
+    ax2.legend(loc='best')  # Ensure the legend is placed correctly
+    ax2.grid(axis='y', linestyle='--', alpha=0.7)
+    ax2.set_xticks(range(len(df['Fornitore'])))  # Imposta i tick corretti
+    ax2.set_xticklabels(df['Fornitore'], rotation=45, ha='right')  # Assegna le etichette
+
+    plt.tight_layout()
+    plt.show()
+
+    # Salva l'immagine su file
+    filename = "performance_fornitori"
+    file_path = create_file_path(filename, "png")
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path

@@ -20,7 +20,9 @@ def generate_report(tool_input, cat):
     """ Genera un report dettagliato sullo stato del magazzino """
 
     # Ottieni i dati dal magazzino
-    stock_data, stock_movement, supplier_performance_data = generate_warehouse_report()
+    stock_data_mrk, stock_data = get_stock_report()
+    stock_movement_mrk, stock_movement = get_stock_movements()
+    supplier_performance_data_mrk, supplier_performance_data = get_supplier_performance_data()
 
     # Prepara il prompt per il modello LLM
     prompt = f"""
@@ -37,13 +39,13 @@ def generate_report(tool_input, cat):
 
     ## **2. Livelli di Stock:**
     Analizza e organizza le informazioni di ogni prodotto nel magazzino con dettagli utili, identifica prodotti con basso stock o a rischio esaurimento.
-    - Nome Prodotto, Codice Prodotto
+    - Nome Prodotto
     - Quantità
     - Stato (🟢 OK, 🟠 Attenzione, 🔴 Critico)
     - Prezzo Unitario (€), Prezzo Totale (€)
 
     Dati disponibili:
-    {stock_data}
+    {stock_data_mrk}
 
     Fai una sintesi delle principali osservazioni emerse dal report.
     Indicazioni su eventuali azioni da intraprendere, come l'adeguamento dei livelli di stock o il riordino di prodotti con scorte basse.
@@ -56,12 +58,12 @@ def generate_report(tool_input, cat):
     Fornire una breve panoramica dello stato attuale del magazzino.
     Descrivere gli obiettivi principali del report, come l'analisi dei movimenti recenti.
     Fare un cenno alla periodicità del report (ad esempio, mensile, settimanale, ecc.).
-    - Nome Prodotto, Codice Prodotto
-    - Data Movimento (formato leggibile), Tipo Movimento (🟢 Entrata, 🔴 Uscita)
-    - Quantità, Fornitore, Indirizzo, Email (se sconosciuto, testo in corsivo grigio chiaro)
+    - Nome Prodotto
+    - Data, Tipo Movimento (🟢 Entrata, 🔴 Uscita)
+    - Quantità, Fornitore, Email (se sconosciuto, testo in corsivo grigio chiaro)
 
     Dati disponibili:
-    {stock_movement}
+    {stock_movement_mrk}
 
     Sintesi delle principali osservazioni emerse dal report.
     Indicazioni su eventuali azioni da intraprendere.
@@ -78,7 +80,7 @@ def generate_report(tool_input, cat):
     - Tempo di Consegna, Ritardo di Consegna, Performance (🟢 Buono, 🟠 Migliorabile, 🔴 Critico)
 
     Dati disponibili:
-    {supplier_performance_data}
+    {supplier_performance_data_mrk}
 
     Specifica che il Tempo Medio di Consegna e il Ritardo Medio di Consegna sono espressi in numero di giorni.
     Sintesi delle principali osservazioni emerse dal report.
@@ -114,7 +116,7 @@ def generate_report(tool_input, cat):
         stream=True,
     )
 
-    write_pdf(output, "report_magazzino")
+    write_pdf(output, "report_magazzino", stock_data, stock_movement, supplier_performance_data)
 
     return output
 
@@ -138,7 +140,7 @@ def generate_stock_report(tool_input, cat):
     """ Genera un report dettagliato sui livelli di stock del magazzino """
 
     # Ottieni i dati dal magazzino
-    stock_data, _ = get_stock_report()
+    stock_data_mrk, stock_data = get_stock_report()
 
     # Prepara il prompt per il modello LLM
     prompt = f"""
@@ -155,7 +157,6 @@ def generate_stock_report(tool_input, cat):
     Analizza e organizza le informazioni di ogni prodotto nel magazzino con dettagli utili, identifica prodotti con basso stock o a rischio esaurimento.
     Dati da includere:
     - Nome Prodotto
-    - Codice Prodotto
     - Quantità
     - Stato (🟢 OK, 🟠 Attenzione, 🔴 Critico)
     - Prezzo Unitario (€)
@@ -168,7 +169,7 @@ def generate_stock_report(tool_input, cat):
     Indica che il threshold è stato impostato al 20% della soglia minima, e spiega come sono indicati i tre livelli di stato.
 
     Dati disponibili:
-    {stock_data}
+    {stock_data_mrk}
     
 
     Obiettivo del Report:
@@ -192,7 +193,7 @@ def generate_stock_report(tool_input, cat):
         stream=True,
     )
     
-    write_pdf(output, "report_livelli_stock")
+    write_pdf(output, "report_livelli_stock", stock_data)
 
     return output
 
@@ -214,7 +215,7 @@ def generate_report_stock_movements(tool_input, cat):
     """ Genera un report dettagliato sui movimenti del magazzino (entrate e uscite) """
 
     # Ottieni i dati dal magazzino
-    stock_movement, _ = get_stock_movements()
+    stock_movement_mrk, stock_movement = get_stock_movements()
 
     # Prepara il prompt per il modello LLM
     prompt = f"""
@@ -231,12 +232,10 @@ def generate_report_stock_movements(tool_input, cat):
     Mostra i prodotti ricevuti o spediti recentemente.
     Dati da includere:
     - Nome del Prodotto
-    - Codice del Prodotto
-    - Data Movimento (usa un formato leggibile)
+    - Data
     - Tipo Movimento (🟢 Entrata, 🔴 Uscita)
     - Quantità
     - Fornitore (Se il fornitore è sconosciuto, utilizzare un testo in corsivo grigio chiaro per differenziarlo)
-    - Indirizzo del Fornitore
     - Email del Fornitore    
 
     3. **Conclusione:**
@@ -246,7 +245,7 @@ def generate_report_stock_movements(tool_input, cat):
     Commento finale sullo stato generale del magazzino e suggerimenti per miglioramenti.
 
     Dati disponibili:
-    {stock_movement}
+    {stock_movement_mrk}
     
 
     Obiettivo del Report:
@@ -269,8 +268,8 @@ def generate_report_stock_movements(tool_input, cat):
         prompt,
         stream=True,
     )
-
-    write_pdf(output, "report_movimenti_magazzino")
+    print("STOCK MOV DATA:", stock_movement['Tipo Movimento'])
+    write_pdf(output, "report_movimenti_magazzino", stock_movement)
 
     return output
 
@@ -291,7 +290,7 @@ def generate_supplier_performance_report(tool_input, cat):
     """ Genera un report dettagliato sulle performance dei fornitori, analizzando tempi di consegna, costi e affidabilità """
 
     # Ottieni i dati sui fornitori e sui prodotti in magazzino
-    supplier_performance_data, _ = get_supplier_performance_data()
+    supplier_performance_data_mrk, supplier_performance_data = get_supplier_performance_data()
 
     # Prepara il prompt per il modello LLM
     prompt = f"""
@@ -321,7 +320,7 @@ def generate_supplier_performance_report(tool_input, cat):
     Raccomandazioni per ottimizzare il processo di approvvigionamento.
 
     Dati disponibili:
-    {supplier_performance_data}
+    {supplier_performance_data_mrk}
 
 
     Obiettivo del Report:
@@ -345,50 +344,6 @@ def generate_supplier_performance_report(tool_input, cat):
         stream=True,
     )
 
-    write_pdf(output, "report_performance_fornitori")
+    write_pdf(output, "report_performance_fornitori", supplier_performance_data)
 
     return output
-
-
-
-
-@tool(
-    return_direct=True,
-    examples=[
-        "Crea un grafico con i livelli di stock",
-        "Qual è la situazione del magazzino? Mostrami un grafico a barre",
-    ]
-)
-def generate_stock_chart(tool_input, cat):
-
-    """ Genera un grafico a barre con i livelli di stock disponibili nel magazzino """
-
-    # Ottieni i dati dal magazzino
-    stock_data, _ = get_stock_report()
-
-    print(type(stock_data))
-
-    print('-------- PRODOTTI --------')
-    prodotti = stock_data['Nome Prodotto']
-    print(prodotti)
-
-    print('-------- QUANTITA DISPONIBILI --------')
-    quantità_disponibili = stock_data["Quantità"]
-    print(quantità_disponibili)
-
-    # Creazione del grafico a barre
-    plt.figure(figsize=(12, 6))
-    plt.bar(prodotti, quantità_disponibili, color='skyblue')
-    plt.title('Quantità Disponibile per Prodotto nel Magazzino')
-    plt.xlabel('Prodotti')
-    plt.ylabel('Quantità Disponibile')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.show()
-
-    filename = "stock_magazzino.png"
-    plt.savefig(filename)
-    # plt.close()
-    
-    return plt
