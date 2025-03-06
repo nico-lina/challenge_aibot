@@ -142,7 +142,7 @@ class OrderForm(SuperCatForm):
         prompt = (
             "Riassumiamo brevemente i dettagli raccolti:\n"
             f"{self._generate_base_message()}\n"
-            "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso creare l'ordine nel sistema? Rispondi dicendo Si puoi inserirlo'"
+            "Dopo il riassunto dei dettaglio Scrivi qualcosa come, 'I dati sono corretti? Posso creare l'ordine nel sistema? Rispondi dicendo Si puoi inserirlo' Nei dettagli non scrivere la valuta"
             "Rispondi con una risposta diretta ma che contenga il riassunto dei dati senza aggiungere commenti tuoi"
         )
 
@@ -155,7 +155,7 @@ class OrderForm(SuperCatForm):
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
             form di creazione dell'ordine."""
-            "Rispondi con una risposta diretta ma che includa il riassunto dei dettagli fin'ora inseriti senza aggiungere commenti tuoi"
+            "Rispondi con una risposta diretta ma che includa il riassunto dei dettagli fin'ora inseriti in maniera leggibile per l'utente senza aggiungere commenti tuoi. Nei dettagli non inserire la valuta"
         )
         return {"output": f"{self.cat.llm(prompt)}"}
 
@@ -195,7 +195,7 @@ def complete_orders_tool(tool_input, cat):
         Che sono contenuti in questo elenco. 
 
         {result}
-        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
+        
 
         """, stream=True)
     
@@ -234,7 +234,6 @@ def delete_order_tool(tool_input, cat):
         Che sono contenuti in questo elenco. 
 
         {result}
-        Per esempio se l'errore è: "Non esiste alcun record ‘purchase.order’ con l’ID 45." Scrivi una cosa come "Errore: l'ID dell'ordine 45 non è valido."
         """, stream=True)
     
     return output.replace("**", "")

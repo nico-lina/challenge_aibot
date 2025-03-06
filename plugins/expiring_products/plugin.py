@@ -39,7 +39,8 @@ def get_the_warehouse_expiration_dates(tool_input, cat):
     ],
 )
 def get_the_expiring_products(tool_input, cat):
-    """Rispondi a "Quali sono i prodotti che scadono entro ... giorni?", dove i giorni sono inseriti in Input dall'utente..."""
+    """Rispondi a "Quali sono i prodotti che scadono entro ... giorni/mesi/anni?", dove i giorni/mesi/anni sono inseriti in Input dall'utente...
+    Se l'input è inserito in mesi o anni viene convertito automaticamente in giorni."""
 
     mark, _ = get_expiring_products(tool_input)
 

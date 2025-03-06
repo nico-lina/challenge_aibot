@@ -32,6 +32,7 @@ def get_the_warehouse_status(tool_input, cat):
         {mark}
         
         Non mostrare quantità riservata e quantità minima
+        
         """,
         stream=True,
     )
@@ -75,9 +76,8 @@ def create_new_product(tool_input, cat):
     result, link = create_product(
         product_name, product_qty, product_min_qty, product_description, product_price
     )
-    if result == True:
-        output = f'Ho creato il prodotto <a href="{link}" target="_blank"> {product_name}</a>'
-        return output
+    if result == True: 
+        return cat.llm(f'Scrivi una cosa come: Ho creato il prodotto {link}')
     else:
         return cat.llm(f"Non ho potuto creare il prodotto, {result}")
 
@@ -103,7 +103,7 @@ def send_mail_to_wh_manager(tool_input, cat):
         cat.llm(f"""Prepara il testo di una mail che dica al responsabile di ordinare
                         i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. 
                         Formatta con HTML la mail ma scrivendo solo il body della mail.
-                        Inserisci come nome del responsabile Luca Marino. Firmati come Oodvisor""")
+                        Inserisci come nome del responsabile Lorenzo. Firmati come Oodvisor""")
         .replace("```html", "")
         .replace("```", "")
     )
@@ -112,7 +112,7 @@ def send_mail_to_wh_manager(tool_input, cat):
     telegram_text = (
         cat.llm(f"""Prepara il testo di un messaggio telegram che dica al responsabile di ordinare
                         i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. Formatta la tabella con il tag <code>.
-                        Inserisci come nome del responsabile Luca Marino. Firmati come Oodvisor""")
+                        Inserisci come nome del responsabile Lorenzo. Firmati come Oodvisor""")
         .replace("```html", "")
         .replace("```", "")
     )
@@ -169,7 +169,7 @@ vecchi fornitori inseriti.
 
         if result:
             return {
-                "output": f'Ho creato il fornitore <a href="{link}" target="_blank"> {supplier_name}</a>'
+                "output": self.cat.llm(f'Scrivi una cosa come: Ho creato il fornitore {link}')
             }
         else:
             return {"output": "Non ho potuto creare il fornitore"}
@@ -190,7 +190,7 @@ vecchi fornitori inseriti.
             """In base a ciò che è ancora necessario,
             crea un suggerimento per aiutare l'utente a compilare il
             form di inserimento del fornitore
-            Rispondi con una risposta diretta con il riassunto dei dati inseriti finora senza aggiungere commenti tuoi"""
+            Rispondi con una risposta diretta con il riassunto dei dati inseriti in modo leggibile per l'utente finora senza aggiungere commenti tuoi"""
         )
         return {"output": f"{self.cat.llm(prompt)}"}
     
@@ -261,9 +261,7 @@ vecchi clienti inseriti.
 
         customer_name = form_data["customer_name"]
         if result:
-            return {
-                "output": f'Ho creato il cliente <a href="{link}" target="_blank"> {customer_name}</a>'
-            }
+            return {"output":self.cat.llm(f'Scrivi una cosa come: Ho creato il cliente {link}') }
         else:
             return {"output": "Non ho potuto creare il cliente"}
 

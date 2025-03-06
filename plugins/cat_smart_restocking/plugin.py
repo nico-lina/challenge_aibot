@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from cat.mad_hatter.decorators import tool
 from datetime import datetime, timedelta
-from .utils import predict_future_demand, suggest_reorder_date, process_supplier_orders, send_telegram_notification
+from .utils import *
 
 @tool(
     return_direct=True,
@@ -99,7 +99,41 @@ def predict_date(tool_input, cat):
         # Invia la notifica Telegram
         send_telegram_notification(telegram_text)
 
-        return f"{output}\n✅ Notifica per **{tool_input}** inviata con successo al responsabile di magazzino!"
+        _, df = get_warehouse()
+        df["Quantità Da Riordinare"] = (
+            df["Quantità Disponibile"]
+            - df["Quantità Riservata"]
+            - df["Quantità Minima di Riordino"]
+        )
+        df_qty_da_ordinare = df[df["Quantità Da Riordinare"] < 0]
+        df_qty_da_ordinare["Quantità Da Riordinare"] = (
+            df_qty_da_ordinare["Quantità Da Riordinare"] * -1
+        )
+        df_qty_da_ordinare = df_qty_da_ordinare[["Prodotto", "Quantità Da Riordinare"]]
+
+        df_qty_da_ordinare_mark = df_qty_da_ordinare.to_markdown(index=False)
+
+        mail_text = (
+            cat.llm(f"""Prepara il testo di una mail che dica al responsabile di ordinare
+                            i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. 
+                            Formatta con HTML la mail ma scrivendo solo il body della mail.
+                            Inserisci come nome del responsabile Lorenzo. Firmati come Oodvisor""")
+            .replace("```html", "")
+            .replace("```", "")
+        )
+
+        send_mail(mail_text, "Notifica Riordino Prodotti")
+        telegram_text = (
+            cat.llm(f"""Prepara il testo di un messaggio telegram che dica al responsabile di ordinare
+                            i seguenti prodotti della tabella {df_qty_da_ordinare_mark}. Formatta la tabella con il tag <code>.
+                            Inserisci come nome del responsabile Lorenzo. Firmati come Oodvisor""")
+            .replace("```html", "")
+            .replace("```", "")
+        )
+        send_telegram_notification_2(telegram_text)
+
+        return f"""{output}\n
+                ✅ Notifica per **{tool_input}** inviata con successo al responsabile di magazzino!"""
 
     # Se l'utente rifiuta, termina l'operazione
     return output

@@ -153,8 +153,9 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
             'product_qty': product_qty,
             'price_unit': price_unit,
             'price_subtotal': product_qty * price_unit,
-            'quantity_received_manual': 0,
-            'date_scheduled' : date_scheduled
+            #'quantity_received_manual': 0,
+            'date_scheduled': datetime.strptime(date_scheduled, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+
         })
 
     # Recuperiamo i dettagli dell'ordine creato
@@ -163,20 +164,21 @@ def generate_order(partner_id, order_lines, name, currency_id, company_id=1, use
     # Creiamo il dizionario con tutte le informazioni
     result = {
         "order_id": order_id,
-        "name": order_details.name,
+        "ordername": order_details.name,
         "partner_id": order_details.partner_id.id if order_details.partner_id else None,
         "partner_name": order_details.partner_id.name if order_details.partner_id else None,
-        "currency_id": order_details.currency_id.id if order_details.currency_id else None,
+        #"currency_id": order_details.currency_id.id if order_details.currency_id else None,
         "currency_name": order_details.currency_id.name if order_details.currency_id else None,
-        "company_id": order_details.company_id.id if order_details.company_id else None,
+        #"company_id": order_details.company_id.id if order_details.company_id else None,
         "company_name": order_details.company_id.name if order_details.company_id else None,
-        "user_id": order_details.user_id.id if order_details.user_id else None,
-        "user_name": order_details.user_id.name if order_details.user_id else None,
+        #"user_id": order_details.user_id.id if order_details.user_id else None,
+        #"user_name": order_details.user_id.name if order_details.user_id else None,
         "date_order": order_details.date_order,
         "amount_total": order_details.amount_total,
         "state": order_details.state,
         "order_lines": order_lines_data
     }
+
 
     return result
 
@@ -206,7 +208,8 @@ def complete_order(order_id):
     
     if order.state != 'draft':  
         return f"Errore: Ordine ID {order_id} non in stato 'Draft' ma '{order.state}'."
-    
+    order_lines_data = []
+
     for line in order.order_line:
         product = line.product_id
         location_id = 4  # Location di partenza
@@ -227,7 +230,12 @@ def complete_order(order_id):
             })
         else:
             lot = StockProductionLot.browse(lot[0])
-       
+
+        order_lines_data.append({
+            "product_id": product.id,
+            "product_name": product.name,
+            "expiration_date": datetime.strptime(expiration_date, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+        })
         quant = StockQuant.search([
             ('product_id', '=', product.id), 
             ('location_id', '=', location_dest_id), 
@@ -259,8 +267,18 @@ def complete_order(order_id):
         'state': 'purchase',
         'effective_date': current_date
     })
+
+    result = {
+        "order_id": order_id,
+        "order_name": order.name,
+        "product_id": product,
+        "date_order": order.date_order,
+        "amount_total": order.amount_total,
+        "data_di_arrivo": datetime.strptime(current_date, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d'),
+        "order_lines_data" : order_lines_data,
+    }
     
-    return f"Successo: Ordine ID {order_id} completato, quantità aggiornata e movimento di magazzino creato."
+    return result
 
 
 

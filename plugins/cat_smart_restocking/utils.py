@@ -6,6 +6,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
 import telepot
+import mailtrap as mt
+
 # import smtplib
 # from email.mime.multipart import MIMEMultipart
 # from email.mime.text import MIMEText
@@ -200,6 +202,12 @@ def send_telegram_notification(telegram_text):
     bot = telepot.Bot(TOKEN)
     bot.sendMessage(7878972936, telegram_text, parse_mode="HTML")
 
+def send_telegram_notification_2(telegram_text):
+    TOKEN = "7539382660:AAHvKE6ovESYyNjodPmVknXmnQqj3omXTiM"
+    #TOKEN = "8042065744:AAF-t4WC2Gb5t7ckcYMGnmTXJmYPtZNuXzM"
+    bot = telepot.Bot(TOKEN)
+    bot.sendMessage(145386464, telegram_text, parse_mode="HTML")
+
 # Funzione principale per gestire gli ordini ai fornitori
 def process_supplier_orders(prodotto):
 
@@ -229,3 +237,79 @@ def process_supplier_orders(prodotto):
         if reorder_date[product] <= datetime.today().strftime('%Y-%m-%d'):
             return supplier["email"]
 
+
+
+def send_mail(mail_text, mail_sbj):
+    mail = mt.Mail(
+    sender=mt.Address(email="hello@demomailtrap.co", name="Mailtrap Test"),
+    to=[mt.Address(email="lorenzooglietti1@gmail.com")],
+    subject= mail_sbj,
+    html=mail_text,
+    category="Notifica magazzino",
+)
+
+    client = mt.MailtrapClient(token="102559b73322273cc1d082e1a4a16b9b")
+    response = client.send(mail)
+    print(response)
+
+
+def get_warehouse():
+    odoo = odoorpc.ODOO("host.docker.internal", port=8069)  # Cambia host e porta se necessario
+
+    # Autenticazione
+    db = "health_final"
+    username = "admin"
+    password = "admin"
+    odoo.login(db, username, password)
+
+    # Modelli Odoo
+    Product = odoo.env["product.product"]
+    StockQuant = odoo.env["stock.quant"]
+    OrderPoint = odoo.env["stock.warehouse.orderpoint"]
+
+    # Recupero prodotti con quantità disponibili a magazzino
+    products = Product.search_read([], ["id", "name"])
+
+    # Dizionario per raccogliere i dati aggregati
+    product_data = {}
+
+    for product in products:
+        product_id = product["id"]
+        product_name = product["name"]
+
+        # Ottieni le quantità per il prodotto
+        quants = StockQuant.search_read(
+            [("product_id", "=", product_id), ("location_id", "=", 8)],
+            ["quantity", "reserved_quantity"],
+        )
+        orderpoint = OrderPoint.search_read(
+            [("product_id", "=", product_id)], ["product_min_qty"]
+        )
+        min_qty = orderpoint[0]["product_min_qty"] if orderpoint else 0  # Default a 0 se non impostata
+
+        # Inizializza il prodotto nel dizionario se non esiste
+        if product_id not in product_data:
+            product_data[product_id] = {
+                "Prodotto": product_name,
+                "Quantità Disponibile": 0,
+                "Quantità Riservata": 0,
+                "Quantità Minima di Riordino": min_qty,
+            }
+
+        # Somma le quantità per lo stesso prodotto
+        for quant in quants:
+            product_data[product_id]["Quantità Disponibile"] += quant["quantity"]
+            product_data[product_id]["Quantità Riservata"] += quant["reserved_quantity"]
+
+    # Creazione DataFrame
+    df = pd.DataFrame(product_data.values())
+
+    if df.empty:
+        return "Nessun prodotto disponibile in magazzino", df
+    
+    df = df[df["Quantità Disponibile"] >= 0]
+
+    # Stampa il DataFrame
+    mark = df.to_markdown(index=False)
+
+    return mark, df
