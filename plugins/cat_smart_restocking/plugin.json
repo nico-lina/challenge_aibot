@@ -1,0 +1,4 @@
+{
+    "name": "Cat Smart Restocking",
+    "description": "Predice la quantità di prodotti che saranno venduti in futuro ed entro quando ordinare un prodotto per evitare di scendere sotto la soglia minima."
+}
